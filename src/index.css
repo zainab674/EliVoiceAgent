@@ -1,0 +1,54 @@
+@import "./styles/design-tokens.css";
+@import "./styles/base.css";
+
+/* Pastel Theme Imports */
+@import "./styles/theme-pastel.css";
+@import "./styles/animations-pastel.css";
+@import "./styles/components/layout-pastel.css";
+@import "./styles/components/metrics-pastel.css";
+
+/* Legacy imports - Commented out */
+/* @import "./styles/components/metrics.css"; */
+/* @import "./styles/components/charts.css"; */
+/* @import "./styles/components/layout.css"; */
+/* @import "./styles/components/glass.css"; */
+/* @import "./styles/components/glass-borders.css"; */
+/* @import "./styles/components/liquid-glass.css"; */
+/* @import "./styles/components/premium-glass.css"; */
+/* @import "./styles/components/ui-themes.css"; */
+/* @import "./styles/components/content-zones.css"; */
+/* @import "./styles/animations.css"; */
+@import "./styles/navigation.css";
+
+/* Theme-aware transcript styles - Pastel Styles */
+.transcript-message-user {
+  @apply bg-white border border-border/50 text-foreground rounded-2xl rounded-tr-none !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.transcript-message-agent {
+  @apply bg-blue-600 text-white rounded-2xl rounded-tl-none !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.dark .transcript-message-user,
+.dark .transcript-message-agent {
+  @apply tracking-normal;
+}
+
+/* Force override for dialog text if needed, but in pastel light mode text should be dark */
+/* [data-radix-dialog-content],
+[data-radix-dialog-content] * {
+  color: inherit !important;
+} */
+
+/* Calendar Overrides */
+.rdp {
+  @apply bg-card border border-border/50 rounded-2xl text-foreground !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.rdp-day_selected {
+  @apply bg-primary text-primary-foreground font-medium rounded-full !important;
+  box-shadow: none !important;
+}

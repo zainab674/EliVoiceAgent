@@ -1,0 +1,219 @@
+/* Light Pastel Theme Component Styles */
+
+/* Pastel Cards - Soft, rounded, inviting */
+.robotics-card {
+    @apply bg-card border border-border/50 relative overflow-hidden rounded-3xl transition-all duration-300;
+    box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.02),
+        0 2px 4px -1px rgba(0, 0, 0, 0.02);
+}
+
+.robotics-card:hover {
+    box-shadow:
+        0 10px 15px -3px rgba(0, 0, 0, 0.05),
+        0 4px 6px -2px rgba(0, 0, 0, 0.02);
+    transform: translateY(-2px);
+}
+
+/* Remove technical corner accents */
+.robotics-card::before,
+.robotics-card::after {
+    content: none !important;
+    display: none !important;
+}
+
+/* Typography Overrides - Soft & Readable */
+.text-tech {
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    font-weight: 500;
+}
+
+/* Soft Borders & Glows */
+.neon-border {
+    @apply border-primary/40;
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.1);
+}
+
+.neon-text-glow {
+    text-shadow: none;
+}
+
+/* Buttons - Soft Pill Shapes */
+.btn-robotics {
+    @apply bg-primary text-primary-foreground border-none relative overflow-hidden transition-all duration-300 rounded-full px-6;
+    clip-path: none !important;
+    /* Remove the angular clip-path */
+}
+
+.btn-robotics:hover {
+    @apply bg-primary/90;
+    box-shadow: 0 4px 12px hsl(var(--primary) / 0.4);
+    transform: translateY(-1px);
+}
+
+/* Inputs - Rounded & Soft */
+.input-robotics {
+    @apply bg-secondary/30 border-transparent text-foreground rounded-xl px-4 py-2;
+    border-bottom-width: 0;
+}
+
+.input-robotics:focus {
+    @apply border-primary/50 ring-2 ring-primary/20 bg-background;
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.1);
+}
+
+/* Background Utility - Soft Pastel Grid */
+.bg-tech-grid {
+    background-image: 
+        radial-gradient(hsl(var(--primary)/0.15) 1px, transparent 1px),
+        radial-gradient(hsl(var(--secondary)/0.1) 1px, transparent 1px);
+    background-size: 24px 24px, 32px 32px;
+    background-position: 0 0, 12px 12px;
+}
+
+/* Glass Classes Update - Pastel Tinted */
+.glass-panel,
+.glass-card,
+.glass-ui .card {
+    @apply bg-white/75 border border-primary/20 backdrop-blur-xl shadow-sm !important;
+    border-radius: 24px !important;
+    background: linear-gradient(135deg, 
+        hsl(var(--card) / 0.9) 0%, 
+        hsl(var(--primary) / 0.05) 100%);
+}
+
+.dark .glass-panel,
+.dark .glass-card,
+.dark .glass-ui .card {
+    @apply border-primary/15;
+    background: linear-gradient(135deg, 
+        hsl(var(--card) / 0.85) 0%, 
+        hsl(var(--primary) / 0.08) 100%);
+}
+
+/* Badge Updates - Soft Pills */
+.badge {
+    @apply rounded-full px-3 py-1 font-medium tracking-normal !important;
+}
+
+/* --- Advanced Layouts Redefinition --- */
+
+/* Angled Card Variant -> Now Soft Card */
+.robotics-card-angled {
+    @apply bg-card/80 backdrop-blur-sm border border-border/50 relative overflow-hidden transition-all duration-300 rounded-3xl;
+    clip-path: none !important;
+}
+
+.robotics-card-angled:hover {
+    @apply border-primary/40 bg-card;
+    box-shadow: 0 10px 30px -10px hsl(var(--primary) / 0.15);
+}
+
+/* Remove corner brackets */
+.robotics-card-angled::before,
+.robotics-card-angled::after {
+    display: none;
+}
+
+/* Hover Reveal Effect - Soft Pastel Gradient */
+.robotics-hover-reveal::before {
+    background: radial-gradient(circle at center, 
+        hsl(var(--primary)/0.12) 0%, 
+        hsl(var(--secondary)/0.08) 40%,
+        transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.robotics-hover-reveal:hover::before {
+    opacity: 1;
+}
+
+/* Grid Layout - Keep structure but soft gap */
+.grid-tech-asym {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 2rem;
+}
+
+@media (min-width: 768px) {
+    .grid-tech-asym {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .grid-tech-asym {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .grid-tech-asym>*:nth-child(1) {
+        grid-column: span 2;
+    }
+
+    .grid-tech-asym>*:nth-child(4) {
+        grid-column: span 2;
+    }
+}
+
+/* Pastel Color Utilities */
+.pastel-lavender {
+    background-color: hsl(280 65% 75% / 0.2);
+    color: hsl(280 30% 25%);
+}
+
+.pastel-mint {
+    background-color: hsl(160 50% 80% / 0.2);
+    color: hsl(160 30% 25%);
+}
+
+.pastel-rose {
+    background-color: hsl(340 70% 85% / 0.2);
+    color: hsl(340 30% 25%);
+}
+
+.pastel-sky {
+    background-color: hsl(200 70% 80% / 0.2);
+    color: hsl(200 30% 25%);
+}
+
+.pastel-peach {
+    background-color: hsl(25 80% 85% / 0.2);
+    color: hsl(25 30% 25%);
+}
+
+/* Pastel Button Variants */
+.btn-pastel-primary {
+    @apply bg-primary text-primary-foreground rounded-full px-6 py-2 transition-all duration-300;
+    box-shadow: 0 4px 12px hsl(var(--primary) / 0.3);
+}
+
+.btn-pastel-primary:hover {
+    @apply bg-primary/90;
+    box-shadow: 0 6px 16px hsl(var(--primary) / 0.4);
+    transform: translateY(-2px);
+}
+
+.btn-pastel-secondary {
+    @apply bg-secondary text-secondary-foreground rounded-full px-6 py-2 transition-all duration-300;
+    box-shadow: 0 4px 12px hsl(var(--secondary) / 0.3);
+}
+
+.btn-pastel-secondary:hover {
+    @apply bg-secondary/90;
+    box-shadow: 0 6px 16px hsl(var(--secondary) / 0.4);
+    transform: translateY(-2px);
+}
+
+.btn-pastel-accent {
+    @apply bg-accent text-accent-foreground rounded-full px-6 py-2 transition-all duration-300;
+    box-shadow: 0 4px 12px hsl(var(--accent) / 0.3);
+}
+
+.btn-pastel-accent:hover {
+    @apply bg-accent/90;
+    box-shadow: 0 6px 16px hsl(var(--accent) / 0.4);
+    transform: translateY(-2px);
+}

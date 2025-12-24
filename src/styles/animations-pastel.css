@@ -1,0 +1,114 @@
+/* Soft Pastel Animation System */
+
+/* Gentle Float */
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+@keyframes pulse-soft {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Redefine Robotics Classes to Soft Animations */
+
+.animate-glitch {
+    /* Instead of glitch, just a gentle float or pulse */
+    animation: float 3s ease-in-out infinite;
+    position: relative;
+    display: inline-block;
+}
+
+.animate-glitch::before,
+.animate-glitch::after {
+    /* Hide glitch artifact layers */
+    display: none !important;
+}
+
+.animate-flash {
+    animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-scanline::before {
+    /* Remove scanline, maybe replace with soft shimmer if needed, but for now remove */
+    content: none !important;
+    display: none !important;
+}
+
+.animate-flicker {
+    /* Soft fade in instead of flicker */
+    animation: fade-in 0.8s ease-out forwards;
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Typewriter - Keep it but make cursor soft color */
+.typewriter-text {
+    overflow: hidden;
+    border-right: .15em solid hsl(var(--primary) / 0.5);
+    white-space: nowrap;
+    animation: typing 3.5s steps(40, end), typing-cursor .75s step-end infinite;
+}
+
+@keyframes typing-cursor {
+
+    0%,
+    100% {
+        border-color: transparent;
+    }
+
+    50% {
+        border-color: hsl(var(--primary));
+    }
+}
+
+/* Page Transitions - Soft Fade */
+.page-enter {
+    animation: fade-in 0.5s ease-out forwards;
+}
+
+.page-exit {
+    opacity: 0;
+    transition: opacity 0.3s ease-in;
+}
+
+/* Hover States replacement */
+.hover-tech-trigger:hover .tech-target {
+    color: hsl(var(--primary));
+    transform: translateY(-2px);
+    transition: all 0.3s ease;
+    animation: none !important;
+}

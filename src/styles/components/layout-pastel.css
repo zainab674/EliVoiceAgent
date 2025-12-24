@@ -1,0 +1,76 @@
+/* Pastel Layout System */
+
+/* HUD Frames - Replaced with Soft Frames */
+.hud-frame {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+}
+
+.hud-frame::before,
+.hud-frame::after {
+    /* Remove corner brackets */
+    content: none !important;
+    display: none !important;
+}
+
+/* Tech Grid Layouts - Replaced with Soft Grids */
+.tech-grid-container {
+    display: grid;
+    gap: 1.5rem;
+    /* Larger gap for breathing room */
+    background-color: transparent;
+    padding: 0;
+}
+
+.tech-grid-item {
+    background-color: transparent;
+}
+
+/* Cutout Panels - Replaced with Rounded Panels */
+.cutout-panel {
+    clip-path: none !important;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border);
+    background: var(--card);
+    position: relative;
+}
+
+/* Layout Zoning - Soft Headers */
+.zone-header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    text-transform: none;
+    /* Remove uppercase */
+    letter-spacing: normal;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+    text-shadow: none;
+}
+
+/* Sidebar Robotics Override -> Pastel Sidebar */
+.sidebar-robotics {
+    border-right: 1px solid var(--border);
+    background: var(--card);
+    /* Solid light background */
+}
+
+.sidebar-item-robotics {
+    border-left: 4px solid transparent;
+    /* Smoother indicator */
+    transition: all 0.2s ease-out;
+    margin-bottom: 4px;
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.sidebar-item-robotics:hover,
+.sidebar-item-robotics.active {
+    border-left-color: var(--primary);
+    background: hsl(var(--primary) / 0.1);
+    color: var(--primary);
+    text-shadow: none;
+}

@@ -1,0 +1,55 @@
+/* Pastel Metrics Display */
+
+.metric-value-tech {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--foreground);
+    text-shadow: none;
+    letter-spacing: normal;
+}
+
+.metric-label-tech {
+    font-size: 0.875rem;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--muted-foreground);
+    font-weight: 500;
+}
+
+/* Terminating Display Style: [ VALUE ] -> Simple Value */
+.metric-bracketed::before,
+.metric-bracketed::after {
+    content: none !important;
+}
+
+/* Bar Charts (CSS only simple bars) */
+.tech-bar-bg {
+    height: 8px;
+    /* Thicker, softer bars */
+    background: var(--secondary);
+    width: 100%;
+    position: relative;
+    border-radius: 9999px;
+}
+
+.tech-bar-fill {
+    height: 100%;
+    background: var(--primary);
+    box-shadow: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 9999px;
+}
+
+/* Digital Counter Look -> Badge Look */
+.digital-counter {
+    background: hsl(var(--primary) / 0.1);
+    color: var(--primary);
+    padding: 0.2em 0.8em;
+    border: none;
+    font-family: 'Inter', system-ui, sans-serif;
+    border-radius: 9999px;
+    font-weight: 600;
+}
