@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Search, Edit2, Plus, Trash2, MoreHorizontal, Check, ChevronsUpDown, User as UserIcon, Loader2 } from "lucide-react";
+import { Search, Edit2, Plus, Trash2, MoreHorizontal, Check, ChevronsUpDown, User as UserIcon, Loader2, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -214,6 +214,15 @@ function AssistantTableRow({
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/voiceagent?assistantId=${assistant.id}`)}
+            className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
+          >
+            <Play className="h-4 w-4" />
+            Start Call
+          </Button>
           <Button
             variant="ghost"
             size="sm"

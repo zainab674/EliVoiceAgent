@@ -748,9 +748,11 @@ class CallHandler:
             pass
 
     async def _perform_post_call_analysis(self, config: Dict[str, Any], session_history: list, agent, call_duration: int = 0) -> Dict[str, Any]:
-        """Perform post-call processing: Summary ONLY (as per requirements)."""
+        """Perform complete post-call analysis including AI-powered outcome determination."""
         analysis_results = {
             "call_summary": None,
+            "call_success": None,
+            "structured_data": {},
             "call_outcome": "Completed", 
             "outcome_confidence": None,
             "outcome_reasoning": None,
@@ -758,35 +760,80 @@ class CallHandler:
         }
 
         try:
-            # Generate call summary if configured
-            # Using a default prompt if none is configured
-            call_summary_prompt = config.get("analysis_summary_prompt") or "Summarize the call"
-            
-            # Process session history to cleaner transcription format for the summary
+            # Process session history to cleaner transcription format
             transcription = []
             for item in session_history:
                 if isinstance(item, dict) and "role" in item and "content" in item:
                     content = item["content"]
-                    if not isinstance(content, str):
+                    # Handle different content formats
+                    if isinstance(content, list):
+                        content_parts = []
+                        for c in content:
+                            if c and str(c).strip():
+                                content_parts.append(str(c).strip())
+                        content = " ".join(content_parts)
+                    elif not isinstance(content, str):
                         content = str(content)
+                    
+                    # Only add non-empty content
                     if content and content.strip():
                         transcription.append({
                             "role": item["role"],
                             "content": content.strip()
                         })
 
-            if call_summary_prompt and transcription:
-                try:
-                    analysis_results["call_summary"] = await self._generate_call_summary_with_llm(
-                        transcription=transcription,
-                        prompt=call_summary_prompt,
-                        timeout=config.get("analysis_summary_timeout", 30)
-                    )
-                    # logger.info(f"CALL_SUMMARY_GENERATED | success=True")
-                except Exception as e:
-                    # logger.warning(f"CALL_SUMMARY_FAILED | error={str(e)}")
-                    pass
-        
+            if not transcription:
+                # logger.warning("NO_TRANSCRIPTION_FOR_ANALYSIS")
+                return analysis_results
+
+            # 1. Use OpenAI to analyze call outcome (Sentiment, Key Points, Reasoning)
+            try:
+                # determine call type (default to inbound for now)
+                call_type = "inbound"
+                outcome_analysis = await self.call_outcome_service.analyze_call_outcome(
+                    transcription=transcription,
+                    call_duration=call_duration,
+                    call_type=call_type
+                )
+                
+                if outcome_analysis:
+                    analysis_results.update({
+                        "call_outcome": outcome_analysis.outcome,
+                        "outcome_confidence": outcome_analysis.confidence,
+                        "outcome_reasoning": outcome_analysis.reasoning,
+                        "outcome_key_points": outcome_analysis.key_points,
+                        "outcome_sentiment": outcome_analysis.sentiment,
+                        "follow_up_required": outcome_analysis.follow_up_required,
+                        "follow_up_notes": outcome_analysis.follow_up_notes
+                    })
+                else:
+                    # Fallback to heuristic-based outcome determination
+                    fallback_outcome = self.call_outcome_service.get_fallback_outcome(transcription, call_duration)
+                    analysis_results["call_outcome"] = fallback_outcome
+                    analysis_results["outcome_reasoning"] = "Fallback heuristic analysis (AI analysis failed)"
+            except Exception as e:
+                # logger.error(f"OUTCOME_ANALYSIS_FAILED | error={str(e)}")
+                pass
+
+            # 2. Use comprehensive analysis processing (Summary, Success, Structured Data)
+            # This calls _generate_call_summary_with_llm, _evaluate_call_success_with_llm, and _extract_structured_data_with_ai
+            try:
+                analysis_data = await self._process_call_analysis(
+                    assistant_id=config.get("id"),
+                    transcription=transcription,
+                    call_duration=call_duration,
+                    agent=agent,
+                    assistant_config=config
+                )
+                
+                # Merge analysis data into results
+                analysis_results.update(analysis_data)
+            except Exception as e:
+                # logger.error(f"PROCESS_CALL_ANALYSIS_FAILED | error={str(e)}")
+                # Fallback to direct agent data if possible
+                if agent and hasattr(agent, 'get_structured_data'):
+                    analysis_results["structured_data"] = agent.get_structured_data()
+
         except Exception as e:
             # logger.error(f"POST_CALL_ANALYSIS_ERROR | error={str(e)}")
             pass
@@ -874,13 +921,13 @@ class CallHandler:
             
             # logger.info(f"PARTICIPANT_IDENTITY_DETERMINED | phone={extract_phone_from_room(ctx.room.name)}")
 
-            # Save to database
+            # Save to database using the intelligent outcome as the status
             success = await self.mongo.save_call_history(
                 call_id=call_id,
                 assistant_id=assistant_config.get("id"),
                 called_did=extract_phone_from_room(ctx.room.name),
                 call_duration=call_duration,
-                call_status="Completed",
+                call_status=analysis_results.get("call_outcome", "Completed"),
                 transcription=transcription,
                 participant_identity=participant_identity,
                 call_sid=call_sid,
