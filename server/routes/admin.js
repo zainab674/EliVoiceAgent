@@ -257,7 +257,7 @@ router.get('/stats/users/:userId', async (req, res) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    const assistCount = await Assistant.countDocuments({ user_id: userId });
+    const assistCount = await Assistant.countDocuments({ userId: userId });
     const smsCount = await SMSMessage.countDocuments({ user_id: userId });
 
     // Mock call stats for now until Call model is confirmed
@@ -290,7 +290,7 @@ router.get('/stats/users', async (req, res) => {
       const userId = user._id;
       // NOTE: This MIGHT be slow if many users. 
 
-      const assistCount = await Assistant.countDocuments({ user_id: userId });
+      const assistCount = await Assistant.countDocuments({ userId: userId });
       const smsCount = await SMSMessage.countDocuments({ user_id: userId });
 
       // Calls are harder if tied to assistant, need join? 
@@ -306,7 +306,7 @@ router.get('/stats/users', async (req, res) => {
       */
       // For now, simpler:
       // Find user's assistants
-      const assistants = await Assistant.find({ user_id: userId }).select('_id');
+      const assistants = await Assistant.find({ userId: userId }).select('_id');
       const assistantIds = assistants.map(a => a._id);
 
 

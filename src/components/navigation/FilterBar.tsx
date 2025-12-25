@@ -9,12 +9,16 @@ import { useAuth } from "@/contexts/SupportAccessAuthContext";
 
 interface FilterBarProps {
   onRangeChange: (range: { from: Date; to: Date }) => void;
+  onAssistantChange?: (assistantId: string) => void;
+  selectedAssistantId?: string;
   title?: string;
   subtitle?: string;
 }
 
 export default function FilterBar({
   onRangeChange,
+  onAssistantChange,
+  selectedAssistantId,
   title,
   subtitle
 }: FilterBarProps) {
@@ -53,6 +57,25 @@ export default function FilterBar({
     enabled: !!user?.id
   });
 
+  const { data: assistants = [] } = useQuery({
+    queryKey: ["assistants"],
+    queryFn: async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return [];
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/assistant`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const json = await response.json();
+        return json.assistants || [];
+      } catch (err) {
+        console.error("Error fetching assistants:", err);
+        return [];
+      }
+    },
+    enabled: !!localStorage.getItem('token')
+  });
+
   // Handle date range changes and share them with the Calls page
   const handleRangeChange = (range: { from: Date; to: Date }) => {
     onRangeChange(range);
@@ -81,30 +104,47 @@ export default function FilterBar({
     }
   };
 
-  return <motion.div className={`${getBackgroundClass()} px-6 py-6`} initial={{
-    opacity: 0,
-    y: -10
-  }} animate={{
-    opacity: 1,
-    y: 0
-  }} transition={{
-    duration: 0.3,
-    delay: 0.1
-  }}>
-    <div className="container mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-extralight tracking-tight text-3xl text-foreground">
-            Welcome back!
-          </h1>
-        </div>
+  return (
+    <motion.div
+      className={`${getBackgroundClass()} px-6 py-6`}
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.1 }}
+    >
+      <div className="container mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="font-extralight tracking-tight text-3xl text-foreground">
+              Welcome back!
+            </h1>
+          </div>
 
-        <div className="flex items-center">
-          <div className="liquid-glass-medium liquid-rounded-lg border border-white/10">
-            <TimeRangeSelector onRangeChange={handleRangeChange} />
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Assistant Selector */}
+            {onAssistantChange && (
+              <div className="liquid-glass-medium liquid-rounded-lg border border-white/10 px-3 py-1 flex items-center">
+                <span className="text-xs text-muted-foreground mr-2 font-medium">Assistant:</span>
+                <select
+                  value={selectedAssistantId || 'all'}
+                  onChange={(e) => onAssistantChange(e.target.value)}
+                  className="bg-transparent border-none text-sm text-foreground focus:ring-0 cursor-pointer outline-none min-w-[120px]"
+                >
+                  <option value="all" className="bg-background">All Assistants</option>
+                  {assistants.map((assistant: any) => (
+                    <option key={assistant._id} value={assistant._id} className="bg-background text-foreground">
+                      {assistant.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="liquid-glass-medium liquid-rounded-lg border border-white/10">
+              <TimeRangeSelector onRangeChange={handleRangeChange} />
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </motion.div>;
+    </motion.div>
+  );
 }

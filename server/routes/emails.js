@@ -1,5 +1,6 @@
 
 import express from 'express';
+import mongoose from 'mongoose';
 import EmailLog from '../models/EmailLog.js';
 import User from '../models/User.js';
 import { protect as requireAuth } from '../middleware/auth.js';
@@ -15,21 +16,36 @@ const router = express.Router();
 router.get('/threads', requireAuth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { search } = req.query;
+        const { search, assistantId } = req.query;
+        const normalizedAssistantId = assistantId && assistantId !== 'all' ? assistantId : null;
 
-        // Fetch user to get active integrations
-        const user = await User.findById(userId).select('email_integrations');
-        const activeEmails = user?.email_integrations?.map(i => i.email) || [];
+        // Find assistants that belong to this user
+        const assistants = await Assistant.find({
+            $or: [
+                { userId: req.user._id },
+                { assignedUserEmail: req.user.email }
+            ]
+        }).select('_id');
+        const assistantIds = assistants.map(a => a._id);
 
         // Group by the "other person" in the conversation
-        // Only include emails that belong to active integrations
-        const matchStage = {
-            userId: req.user._id,
+        // Include emails where user is the owner OR the assistant is assigned to the user
+        let matchStage = {
             $or: [
-                { from: { $in: activeEmails } },
-                { to: { $in: activeEmails } }
+                { userId: req.user._id },
+                { assistantId: { $in: assistantIds } }
             ]
         };
+
+        if (normalizedAssistantId) {
+            matchStage = {
+                assistantId: new mongoose.Types.ObjectId(normalizedAssistantId)
+            };
+            // Optional security: ensure the assistantId belongs to the user
+            if (!assistantIds.some(id => id.toString() === normalizedAssistantId) && req.user.role !== 'admin') {
+                return res.status(403).json({ success: false, message: 'Access denied to this assistant' });
+            }
+        }
 
         const threads = await EmailLog.aggregate([
             { $match: matchStage },
@@ -127,10 +143,14 @@ router.get('/:id', requireAuth, async (req, res) => {
 
         let query;
 
-        // Fetch user active emails to filter conversations strictly
-        // We only want to show emails involved with OUR connected accounts
-        const user = await User.findById(req.user.id).select('email_integrations');
-        const activeEmails = user?.email_integrations?.map(i => i.email) || [];
+        // Find assistants that belong to this user
+        const assistants = await Assistant.find({
+            $or: [
+                { userId: req.user._id },
+                { assignedUserEmail: req.user.email }
+            ]
+        }).select('_id');
+        const assistantIds = assistants.map(a => a._id);
 
         if (id.includes('@')) {
             // Extract email if format is "Name <email@domain.com>"
@@ -141,29 +161,36 @@ router.get('/:id', requireAuth, async (req, res) => {
             const escapedEmail = cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const emailRegex = new RegExp(escapedEmail, 'i');
 
-            console.log(`[EmailAPI] Searching for conversations between [${activeEmails.join(', ')}] and [${cleanEmail}]`);
+            console.log(`[EmailAPI] Searching for conversations with [${cleanEmail}]`);
 
-            // STRICT QUERY: 
-            // 1. From Contact AND To Me (Inbound)
-            // 2. From Me AND To Contact (Outbound)
             query = {
-                userId: req.user._id,
-                $or: [
+                $and: [
                     {
-                        from: { $regex: emailRegex },
-                        to: { $in: activeEmails } // MUST be addressed to us
+                        $or: [
+                            { userId: req.user._id },
+                            { assistantId: { $in: assistantIds } }
+                        ]
                     },
                     {
-                        from: { $in: activeEmails }, // MUST be sent by us
-                        to: { $regex: emailRegex }
+                        $or: [
+                            { from: { $regex: emailRegex } },
+                            { to: { $regex: emailRegex } }
+                        ]
                     }
                 ]
             };
         } else {
-            // It's a threadId (legacy or specific thread)
+            // It's a threadId
             query = {
-                userId: req.user._id,
-                threadId: id
+                $and: [
+                    {
+                        $or: [
+                            { userId: req.user._id },
+                            { assistantId: { $in: assistantIds } }
+                        ]
+                    },
+                    { threadId: id }
+                ]
             };
         }
 

@@ -11,10 +11,23 @@ const router = express.Router();
 // Middleware
 router.use(authenticateToken);
 
+import Assistant from '../models/Assistant.js';
+
+// ...
+
 // GET /api/v1/campaigns
 router.get('/', async (req, res) => {
     try {
-        const campaigns = await Campaign.find({ userId: req.user.id })
+        // Find assistants that belong to this user
+        const assistants = await Assistant.find({ userId: req.user.id }).select('_id');
+        const assistantIds = assistants.map(a => a._id);
+
+        const campaigns = await Campaign.find({
+            $or: [
+                { userId: req.user.id },
+                { assistantId: { $in: assistantIds } }
+            ]
+        })
             .sort({ createdAt: -1 })
             .populate('assistantId', 'name')
             .populate('contactListId', 'name')

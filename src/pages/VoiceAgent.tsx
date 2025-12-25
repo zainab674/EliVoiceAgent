@@ -62,7 +62,8 @@ export default function VoiceAgent() {
 
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/assistants/${assistantId}`, {
+        const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
+        const response = await fetch(`${baseUrl}/api/v1/assistants/${assistantId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 

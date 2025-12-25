@@ -30,6 +30,7 @@ import callEmailRouter from './routes/call-email.js';
 import conversationRouter from './routes/conversation.js';
 import phoneNumberRouter from './routes/phoneNumber.js';
 import emailRouter from './routes/emails.js';
+import smsRouter from './routes/sms.js';
 import integrationRoutes from './routes/integration.js';
 
 import connectDB from './lib/mongodb.js';
@@ -75,6 +76,7 @@ app.use('/api/v1/calls', callEmailRouter);
 app.use('/api/v1/conversations', conversationRouter);
 app.use('/api/v1/phone-numbers', phoneNumberRouter);
 app.use('/api/v1/emails', emailRouter);
+app.use('/api/v1/sms', smsRouter);
 console.log('Minutes routes registered at /api/v1/minutes');
 console.log('Minutes pricing routes registered at /api/v1/minutes-pricing and /api/v1/admin/minutes-pricing');
 console.log('Admin routes registered at /api/v1/admin');

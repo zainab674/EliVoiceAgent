@@ -14,7 +14,8 @@ export const fetchCalls = async () => {
       return { calls: [], total: 0 };
     }
 
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/calls`, {
+    const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
+    const response = await fetch(`${baseUrl}/api/v1/calls`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

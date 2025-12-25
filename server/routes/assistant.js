@@ -10,9 +10,22 @@ const router = express.Router();
 // @access  Private
 router.get('/', protect, async (req, res) => {
     try {
-        const assistants = await Assistant.find({ userId: req.user._id });
+        let query = {
+            $or: [
+                { userId: req.user._id },
+                { assignedUserEmail: req.user.email }
+            ]
+        };
+
+        // If admin, show all assistants
+        if (req.user.role === 'admin' || req.user.role === 'super-admin') {
+            query = {};
+        }
+
+        const assistants = await Assistant.find(query);
         res.json(assistants);
     } catch (error) {
+        console.error('Error fetching assistants:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 });
@@ -25,8 +38,12 @@ router.get('/:id', protect, async (req, res) => {
         const assistant = await Assistant.findById(req.params.id);
 
         if (assistant) {
-            // Ensure user owns this assistant or is admin
-            if (assistant.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+            // Check if user owns this assistant, is assigned via email, or is admin
+            const isOwner = assistant.userId.toString() === req.user._id.toString();
+            const isAssigned = assistant.assignedUserEmail === req.user.email;
+            const isAdmin = req.user.role === 'admin' || req.user.role === 'super-admin';
+
+            if (!isOwner && !isAssigned && !isAdmin) {
                 return res.status(401).json({ message: 'Not authorized' });
             }
             res.json(assistant);
@@ -182,7 +199,12 @@ router.put('/:id', protect, async (req, res) => {
         const assistant = await Assistant.findById(req.params.id);
 
         if (assistant) {
-            if (assistant.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+            // Check if user owns this assistant, is assigned via email, or is admin
+            const isOwner = assistant.userId.toString() === req.user._id.toString();
+            const isAssigned = assistant.assignedUserEmail === req.user.email;
+            const isAdmin = req.user.role === 'admin' || req.user.role === 'super-admin';
+
+            if (!isOwner && !isAssigned && !isAdmin) {
                 return res.status(401).json({ message: 'Not authorized' });
             }
 

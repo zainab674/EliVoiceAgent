@@ -7,6 +7,7 @@ import { protect as requireAuth } from '../middleware/auth.js';
 import multer from 'multer';
 import fs from 'fs';
 import emailService from '../services/email-service.js';
+import Assistant from '../models/Assistant.js';
 
 const router = express.Router();
 
@@ -24,7 +25,16 @@ const upload = multer({
 // GET /api/v1/email-campaigns
 router.get('/', requireAuth, async (req, res) => {
     try {
-        const campaigns = await EmailCampaign.find({ userId: req.user.id })
+        // Find assistants that belong to this user
+        const assistants = await Assistant.find({ userId: req.user.id }).select('_id');
+        const assistantIds = assistants.map(a => a._id);
+
+        const campaigns = await EmailCampaign.find({
+            $or: [
+                { userId: req.user.id },
+                { assistantId: { $in: assistantIds } }
+            ]
+        })
             .populate('assistantId', 'name')
             .sort({ createdAt: -1 });
 

@@ -41,6 +41,7 @@ export default function Index() {
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date()
   });
+  const [selectedAssistantId, setSelectedAssistantId] = useState<string>('all');
   const [realCallHistory, setRealCallHistory] = useState<CallHistory[]>([]);
   const [isLoadingRealData, setIsLoadingRealData] = useState(true);
 
@@ -78,7 +79,8 @@ export default function Index() {
       if (!token) throw new Error("No token found");
 
       // Fetch calls directly from backend
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/calls?limit=200`, {
+      const assistantQuery = selectedAssistantId !== 'all' ? `&assistant_id=${selectedAssistantId}` : '';
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/calls?limit=200${assistantQuery}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -90,13 +92,13 @@ export default function Index() {
       }
 
       const result = await response.json();
-      const calls = result.calls || [];
+      const calls = result.data?.calls || result.calls || [];
 
       // Map backend fields to frontend interface
       const mappedCalls = calls.map((c: any) => ({
         ...c,
         id: c._id || c.id,
-        created_at: c.created_at || c.start_time
+        created_at: c.created_at || c.start_time || new Date().toISOString()
       }));
 
       setRealCallHistory(mappedCalls);
@@ -109,7 +111,7 @@ export default function Index() {
 
   useEffect(() => {
     fetchCallHistory();
-  }, [isAuthLoading, user?.id]);
+  }, [isAuthLoading, user?.id, selectedAssistantId]);
 
   // Trigger API call on route changes
   useRouteChangeData(fetchCallHistory, [isAuthLoading, user?.id], {
@@ -253,6 +255,96 @@ export default function Index() {
     }, {} as Record<string, number>);
   }, [callLogs]);
 
+  // Fetch email history
+  const [emailThreads, setEmailThreads] = useState<any[]>([]);
+  const fetchEmailHistory = async () => {
+    if (isAuthLoading || !user?.id) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const assistantQuery = selectedAssistantId !== 'all' ? `?assistantId=${selectedAssistantId}` : '';
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/emails/threads${assistantQuery}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const json = await response.json();
+      if (json.success) {
+        setEmailThreads(json.threads || []);
+      }
+    } catch (error) {
+      console.error('Error fetching emails:', error);
+    }
+  };
+
+  const [smsMessages, setSmsMessages] = useState<any[]>([]);
+
+  const fetchSmsHistory = async () => {
+    if (isAuthLoading || !user?.id) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const assistantQuery = selectedAssistantId !== 'all' ? `?assistant_id=${selectedAssistantId}` : '';
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/sms${assistantQuery}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const json = await response.json();
+      if (json.success) {
+        setSmsMessages(json.data.messages || []);
+      }
+    } catch (error) {
+      console.error('Error fetching SMS:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmailHistory();
+    fetchSmsHistory();
+  }, [isAuthLoading, user?.id, selectedAssistantId]);
+
+  // Combine calls and emails for unified activity
+  const unifiedActivity = useMemo(() => {
+    const activities = [
+      ...callLogs.map(call => ({
+        ...call,
+        type: 'call',
+        timestamp: new Date(call.created_at || call.date).getTime()
+      })),
+      ...emailThreads.map(email => ({
+        id: email.id,
+        name: email.senderName || email.senderEmail,
+        subject: email.subject,
+        snippet: email.lastMessage,
+        date: new Date(email.timestamp).toLocaleDateString('en-US'),
+        time: new Date(email.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        type: 'email',
+        messageCount: email.messageCount,
+        timestamp: new Date(email.timestamp).getTime(),
+        status: 'completed'
+      })),
+      ...smsMessages.map(sms => ({
+        id: sms._id,
+        name: sms.direction === 'inbound' ? sms.fromNumber : sms.toNumber,
+        phoneNumber: sms.direction === 'inbound' ? sms.fromNumber : sms.toNumber,
+        snippet: sms.body,
+        date: new Date(sms.createdAt).toLocaleDateString('en-US'),
+        time: new Date(sms.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        type: 'message',
+        direction: sms.direction,
+        timestamp: new Date(sms.createdAt).getTime(),
+        status: sms.status
+      }))
+    ];
+
+    return activities.sort((a, b) => b.timestamp - a.timestamp);
+  }, [callLogs, emailThreads, smsMessages]);
+
+  // Calculate email stats
+  const emailStats = useMemo(() => {
+    return {
+      totalThreads: emailThreads.length,
+      totalMessages: emailThreads.reduce((sum, t) => sum + (t.messageCount || 1), 0)
+    };
+  }, [emailThreads]);
+
 
   // Show loading state if auth is still loading
   if (isAuthLoading) {
@@ -281,11 +373,17 @@ export default function Index() {
   return (
     <DashboardLayout>
       <div className="relative">
-        <FilterBar onRangeChange={handleRangeChange} />
+        <FilterBar
+          onRangeChange={handleRangeChange}
+          onAssistantChange={setSelectedAssistantId}
+          selectedAssistantId={selectedAssistantId}
+        />
       </div>
       <DashboardContent
         dateRange={dateRange}
         callLogs={callLogs}
+        unifiedActivity={unifiedActivity}
+        emailStats={emailStats}
         isLoading={isAuthLoading || isLoadingRealData}
         stats={stats}
         callOutcomesData={callOutcomesData}

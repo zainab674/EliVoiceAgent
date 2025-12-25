@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Phone, Users, TrendingUp, Settings, Play, Edit2, Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/SupportAccessAuthContext";
+import { Assistant } from "@/lib/api/assistants/fetchAssistants";
 
 import {
   ThemedDialog,
@@ -12,26 +13,6 @@ import {
   ThemedDialogHeader,
 } from "@/components/ui/themed-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface Assistant {
-  id: string;
-  name: string;
-  description: string;
-  prompt?: string;
-  first_message?: string;
-  first_sms?: string;
-  sms_prompt?: string;
-  status: "draft" | "active" | "inactive";
-  interactionCount: number;
-  userCount: number;
-  cal_api_key?: string;
-  cal_event_type_slug?: string;
-  cal_event_type_id?: string;
-  cal_timezone?: string;
-  cal_enabled?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
 
 // Utility functions
 const formatPhoneNumber = (number: string) => {
@@ -210,7 +191,7 @@ export function AssistantDetailsDialog({ assistant, isOpen, onClose }: Assistant
                     {assistant.name}
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    {assistant.description.substring(0, 70)}...
+                    {assistant.description ? (assistant.description.length > 70 ? `${assistant.description.substring(0, 70)}...` : assistant.description) : "No description provided"}
                   </p>
                 </div>
               </div>

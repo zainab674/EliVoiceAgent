@@ -296,7 +296,8 @@ export function AssistantsTab({ tabChangeTrigger = 0 }: AssistantsTabProps) {
       const fetchUsers = async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/v1/admin/users`, {
+          const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
+          const response = await fetch(`${baseUrl}/api/v1/admin/users`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const data = await response.json();
@@ -330,7 +331,8 @@ export function AssistantsTab({ tabChangeTrigger = 0 }: AssistantsTabProps) {
   const handleAssignUser = async (assistantId: string, email: string) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/v1/assistants/${assistantId}`, {
+      const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
+      const response = await fetch(`${baseUrl}/api/v1/assistants/${assistantId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -373,7 +375,8 @@ export function AssistantsTab({ tabChangeTrigger = 0 }: AssistantsTabProps) {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/v1/assistants/${assistantId}`, {
+      const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
+      const response = await fetch(`${baseUrl}/api/v1/assistants/${assistantId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

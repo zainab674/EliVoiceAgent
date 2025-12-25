@@ -12,7 +12,8 @@ import {
   ArrowRight,
   PhoneCall,
   Briefcase,
-  Megaphone
+  Megaphone,
+  Mail
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { fetchContacts } from "@/lib/api/contacts/fetchContacts";
@@ -26,6 +27,11 @@ interface DashboardContentProps {
     to: Date;
   };
   callLogs: any[];
+  unifiedActivity: any[];
+  emailStats: {
+    totalThreads: number;
+    totalMessages: number;
+  };
   isLoading: boolean;
   stats: {
     totalCalls: number;
@@ -41,6 +47,8 @@ interface DashboardContentProps {
 export default function DashboardContent({
   dateRange,
   callLogs,
+  unifiedActivity,
+  emailStats,
   isLoading,
   stats,
   callOutcomesData
@@ -118,11 +126,9 @@ export default function DashboardContent({
   const activePhoneNumbers = phoneNumbers.filter(p => p.status === 'active').length;
   const activeCampaigns = campaigns.filter(c => c.executionStatus === 'running').length;
 
-  const recentCalls = useMemo(() => {
-    return [...callLogs]
-      .sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime())
-      .slice(0, 5);
-  }, [callLogs]);
+  const recentActivity = useMemo(() => {
+    return (unifiedActivity || []).slice(0, 7);
+  }, [unifiedActivity]);
 
   const formatDuration = (seconds: number) => {
     if (!seconds) return "0:00";
@@ -212,12 +218,12 @@ export default function DashboardContent({
                   <p className="text-xs text-muted-foreground">Avg Duration</p>
                 </div>
                 <div className="p-3 rounded-lg bg-secondary/20 border border-border text-center">
-                  <p className="text-2xl font-bold">{stats.appointments}</p>
-                  <p className="text-xs text-muted-foreground">Appointments</p>
+                  <p className="text-2xl font-bold">{emailStats?.totalThreads || 0}</p>
+                  <p className="text-xs text-muted-foreground">Active Email Threads</p>
                 </div>
                 <div className="p-3 rounded-lg bg-secondary/20 border border-border text-center">
-                  <p className="text-2xl font-bold text-success">{stats.bookingRate}%</p>
-                  <p className="text-xs text-muted-foreground">Conversion</p>
+                  <p className="text-2xl font-bold text-success">{stats.appointments}</p>
+                  <p className="text-xs text-muted-foreground">Appointments</p>
                 </div>
               </div>
 
@@ -233,6 +239,18 @@ export default function DashboardContent({
                 </Badge>
               </div>
 
+              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/20 border border-border mt-2">
+                <div className="flex items-center gap-3">
+                  <Mail className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <p className="font-medium text-foreground">Total Emails</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="text-lg font-semibold">
+                  {emailStats?.totalMessages || 0}
+                </Badge>
+              </div>
+
               {/* Only show "Manage All" if admin */}
               {user?.role === 'admin' && (
                 <Link to="/assistants">
@@ -244,67 +262,118 @@ export default function DashboardContent({
             </CardContent>
           </Card>
 
-          {/* Recent Calls */}
+          {/* Recent Activity */}
           <Card className="lg:col-span-2 border-2 border-border">
             <CardHeader className="border-b border-border">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <Phone className="h-5 w-5 text-primary" />
+                  <Activity className="h-5 w-5 text-primary" />
                   Recent Activity
                 </CardTitle>
-                <Link to="/calls">
-                  <Button variant="ghost" size="sm">
-                    View Call Log <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
+                <div className="flex gap-2">
+                  <Link to="/calls">
+                    <Button variant="ghost" size="sm">
+                      Calls
+                    </Button>
+                  </Link>
+                  <Link to="/emails">
+                    <Button variant="ghost" size="sm">
+                      Emails
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-6">
-              {recentCalls.length > 0 ? (
+              {recentActivity.length > 0 ? (
                 <div className="space-y-3">
-                  {recentCalls.map((call) => (
+                  {recentActivity.map((activity: any) => (
                     <div
-                      key={call.id}
+                      key={`${activity.type}-${activity.id}`}
                       className="flex items-center justify-between p-3 rounded-lg border-2 border-border hover:bg-accent/20 hover:border-primary/30 transition-colors"
                     >
                       <div className="flex items-center gap-3 flex-1">
-                        <div className={`p-2 rounded-full ${call.call_outcome?.toLowerCase().includes('appointment') ||
-                          call.resolution?.toLowerCase().includes('appointment')
-                          ? 'bg-success/20 text-success'
-                          : 'bg-muted text-muted-foreground'
+                        <div className={`p-2 rounded-full ${activity.type === 'call'
+                            ? (activity.call_outcome?.toLowerCase().includes('appointment') ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground')
+                            : activity.type === 'message'
+                              ? 'bg-purple-500/10 text-purple-500'
+                              : 'bg-blue-500/10 text-blue-500' // Email style
                           }`}>
-                          {call.call_outcome?.toLowerCase().includes('appointment') ||
-                            call.resolution?.toLowerCase().includes('appointment') ? (
-                            <CheckCircle2 className="h-4 w-4" />
+                          {activity.type === 'call' ? (
+                            activity.call_outcome?.toLowerCase().includes('appointment') ? <CheckCircle2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />
+                          ) : activity.type === 'message' ? (
+                            <MessageSquare className="h-4 w-4" />
                           ) : (
-                            <Phone className="h-4 w-4" />
+                            <Mail className="h-4 w-4" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground truncate">
-                            {call.name || call.phoneNumber || 'Unknown'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {call.date} • {call.duration || formatDuration(call.call_duration || 0)}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-foreground truncate">
+                              {activity.name || activity.phoneNumber || 'Unknown'}
+                            </p>
+                            {activity.type === 'email' && (
+                              <Badge variant="outline" className="text-[10px] h-4 px-1">
+                                Email
+                              </Badge>
+                            )}
+                            {activity.type === 'message' && (
+                              <Badge variant="outline" className="text-[10px] h-4 px-1">
+                                SMS
+                              </Badge>
+                            )}
+                          </div>
+
+                          {activity.type === 'call' ? (
+                            <p className="text-sm text-muted-foreground">
+                              {activity.date} • {activity.duration || formatDuration(activity.call_duration || 0)}
+                            </p>
+                          ) : activity.type === 'message' ? (
+                            <p className="text-sm text-muted-foreground truncate">
+                              {activity.snippet}
+                              <span className="opacity-50 mx-1">•</span>
+                              {activity.time}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground truncate">
+                              {activity.subject}
+                              <span className="opacity-50 mx-1">•</span>
+                              {activity.time}
+                            </p>
+                          )}
                         </div>
                       </div>
-                      <Badge
-                        variant={
-                          call.call_outcome?.toLowerCase().includes('appointment') ? 'default' :
-                            call.call_outcome?.toLowerCase().includes('spam') ? 'destructive' :
-                              'secondary'
-                        }
-                        className="ml-2"
-                      >
-                        {call.call_outcome || call.resolution || 'No Outcome'}
-                      </Badge>
+
+                      {activity.type === 'call' && (
+                        <Badge
+                          variant={
+                            activity.call_outcome?.toLowerCase().includes('appointment') ? 'default' :
+                              activity.call_outcome?.toLowerCase().includes('spam') ? 'destructive' :
+                                'secondary'
+                          }
+                          className="ml-2"
+                        >
+                          {activity.call_outcome || activity.resolution || 'Call'}
+                        </Badge>
+                      )}
+
+                      {activity.type === 'message' && (
+                        <Badge variant="secondary" className="ml-2 capitalize">
+                          {activity.status || 'Sent'}
+                        </Badge>
+                      )}
+
+                      {activity.type === 'email' && (
+                        <Badge variant="secondary" className="ml-2">
+                          {activity.messageCount} msgs
+                        </Badge>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Phone className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <Activity className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>No recent activity recorded.</p>
                 </div>
               )}

@@ -157,7 +157,7 @@ const AdminPanel = () => {
     setPlanDialogLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
 
       const response = await fetch(`${backendUrl}/api/v1/admin/users/${planDialogUser.id}`, {
         method: 'PUT',
@@ -224,7 +224,7 @@ const AdminPanel = () => {
     try {
       setLoadingMinutePricing(true);
       const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
 
       const response = await fetch(`${backendUrl}/api/v1/admin/minutes-pricing`, {
         headers: {
@@ -259,7 +259,7 @@ const AdminPanel = () => {
     try {
       setSavingMinutePricing(true);
       const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
 
       const payload = {
         tenant: 'main',
@@ -347,7 +347,7 @@ const AdminPanel = () => {
     try {
       setLoadingPlanConfigs(true);
       const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
 
       const updateData: any = {
         name: editPlanData.name,
@@ -393,7 +393,7 @@ const AdminPanel = () => {
     try {
       setLoadingPlanConfigs(true);
       const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
 
       const response = await fetch(`${backendUrl}/api/v1/admin/plans/${deletingPlanKey}/delete`, {
         method: 'POST',
@@ -469,7 +469,7 @@ const AdminPanel = () => {
         throw new Error('No session found. Please log in again.');
       }
 
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
 
       const response = await fetch(`${backendUrl}/api/v1/admin/users`, {
         method: 'GET',
@@ -503,7 +503,7 @@ const AdminPanel = () => {
   const fetchAllUserStats = async (users: User[]) => {
     try {
       const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
 
       const response = await fetch(`${backendUrl}/api/v1/admin/stats/users`, {
         headers: {
@@ -528,7 +528,7 @@ const AdminPanel = () => {
       console.log('🔍 Fetching stats for user:', userId);
 
       const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
 
       const response = await fetch(`${backendUrl}/api/v1/admin/stats/users/${userId}`, {
         headers: {
@@ -559,7 +559,7 @@ const AdminPanel = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
 
       const response = await fetch(`${backendUrl}/api/v1/admin/users/${selectedUser.id}`, {
         method: 'PUT',
@@ -592,7 +592,7 @@ const AdminPanel = () => {
     try {
       const userId = selectedUser.id;
       const token = localStorage.getItem('token');
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
 
       const deleteResponse = await fetch(`${backendUrl}/api/v1/admin/users/${userId}`, {
         method: 'DELETE',

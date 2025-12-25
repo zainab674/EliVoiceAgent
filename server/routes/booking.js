@@ -16,15 +16,34 @@ router.get('/', protect, async (req, res) => {
         // Get query parameters for filtering
         const { status, assistantId, startDate, endDate } = req.query;
 
+        // Find assistants that belong to this user (either owned or assigned by email)
+        const userAssistants = await Assistant.find({
+            $or: [
+                { userId: req.user._id },
+                { assignedUserEmail: req.user.email }
+            ]
+        }).select('_id');
+        const assistantIdsFromList = userAssistants.map(a => a._id);
+
         // Build query
-        const query = { userId };
+        const query = {
+            $or: [
+                { userId: req.user._id },
+                { assistantId: { $in: assistantIdsFromList } }
+            ]
+        };
 
         if (status && status !== 'all') {
             query.status = status;
         }
 
         if (assistantId && assistantId !== 'all') {
+            // If filtering by specific assistant, override the $or but ensure they have access
+            if (!assistantIdsFromList.map(id => id.toString()).includes(assistantId.toString()) && req.user.role !== 'admin') {
+                return res.status(403).json({ message: 'Access denied to this assistant' });
+            }
             query.assistantId = assistantId;
+            delete query.$or;
         }
 
         if (startDate || endDate) {
@@ -165,10 +184,18 @@ router.patch('/:id', protect, async (req, res) => {
 router.get('/assistant/:assistantId', protect, async (req, res) => {
     try {
         const bookings = await Appointment.find({ assistantId: req.params.assistantId }).sort({ startTime: 1 });
-        // Verify ownership
+        // Verify ownership or assignment
         const assistant = await Assistant.findById(req.params.assistantId);
-        if (!assistant || assistant.userId.toString() !== req.user._id.toString()) {
-            return res.status(401).json({ message: 'Not authorized' });
+        if (!assistant) {
+            return res.status(404).json({ message: 'Assistant not found' });
+        }
+
+        const isOwner = assistant.userId.toString() === req.user._id.toString();
+        const isAssigned = assistant.assignedUserEmail === req.user.email;
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'super-admin';
+
+        if (!isOwner && !isAssigned && !isAdmin) {
+            return res.status(401).json({ message: 'Not authorized to view bookings for this assistant' });
         }
         res.json(bookings);
     } catch (error) {
