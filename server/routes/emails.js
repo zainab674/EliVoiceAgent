@@ -2,6 +2,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import EmailLog from '../models/EmailLog.js';
+import Assistant from '../models/Assistant.js';
 import User from '../models/User.js';
 import { protect as requireAuth } from '../middleware/auth.js';
 import multer from 'multer';
@@ -129,7 +130,7 @@ router.get('/threads', requireAuth, async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching email threads:', error);
-        res.status(500).json({ success: false, message: 'Failed to fetch emails' });
+        res.status(500).json({ success: false, message: 'Failed to fetch emails', error: error.message });
     }
 });
 

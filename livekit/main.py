@@ -173,6 +173,10 @@ _OPENAI_CLIENT = AsyncOpenAI(
 # --------------------------------------------------------------------------
 
 
+# Global pre-warmed components
+_PREWARMED_VAD = None
+_PREWARMED_LOCK = asyncio.Lock()
+
 class CallHandler:
     """Simplified call handler following LiveKit patterns."""
 
@@ -183,43 +187,17 @@ class CallHandler:
         # Initialize refactored components
         self.config_resolver = ConfigResolver(self.mongo)
         
-        # Pre-warm critical components for faster response
-        self._prewarmed_agents = {}
-        self._prewarmed_llms = {}
-        self._prewarmed_tts = {}
-        self._prewarmed_vad = None
-        
-        # Latency monitoring variables
-        self.end_of_utterance_delay = 0
-        self.llm_latency = 0
-        self.tts_latency = 0
-        
         # Track idle message counts per session
         self._idle_message_counts = {}
-        
-        # Start pre-warming in background
-        asyncio.create_task(self._prewarm_components())
 
-    async def _prewarm_components(self):
-        """Pre-warm critical components to eliminate cold start latency."""
-        try:            
-            self._prewarmed_vad = silero.VAD.load()
-            
-
-            
-            # LLM will be created dynamically based on assistant configuration
-            # No hardcoded LLM prewarming - each assistant uses its own LLM settings
-            logger.info("PREWARM_LLM | LLM will be created dynamically per assistant config")
-            
-            # Pre-warm TTS with default settings (removed hardcoded OpenAI prewarming)
-            # TTS will be created dynamically based on assistant configuration
-            logger.info("PREWARM_TTS | TTS will be created dynamically per assistant config")
-            
-            # logger.info("PREWARM_COMPLETE | all components warmed up")
-            
-        except Exception as e:
-            # logger.error("PREWARM_ERROR | failed to pre-warm components: %s", str(e))
-            pass
+    async def _ensure_vad(self):
+        """Ensure VAD is loaded (singleton-ish)."""
+        global _PREWARMED_VAD
+        if _PREWARMED_VAD is None:
+            async with _PREWARMED_LOCK:
+                if _PREWARMED_VAD is None:
+                    _PREWARMED_VAD = silero.VAD.load()
+        return _PREWARMED_VAD
 
     def _on_metrics_collected(self, event: MetricsCollectedEvent):
         """Handle metrics collection events for latency monitoring."""
@@ -490,6 +468,13 @@ class CallHandler:
 
             profiler.checkpoint("config_resolved", {"call_type": call_type})
 
+            # Check if another agent is already in the room
+            # Usually only 1 agent should be present per room to avoid "ignoring" issues
+            remote_participants = [p for p in ctx.room.remote_participants.values() if p.identity.startswith("agent")]
+            if remote_participants:
+                logger.warning(f"MULTIPLE_AGENTS_DETECTED | room={ctx.room.name} | existing_agents={len(remote_participants)}")
+                # We don't necessarily kill it, but we log the warning for debugging
+
             if not assistant_config:
                 # logger.error(f"NO_ASSISTANT_CONFIG | room={ctx.room.name}")
                 profiler.finish(success=False, error="No assistant config found")
@@ -539,7 +524,7 @@ class CallHandler:
                     logger.error(f"METADATA_INJECTION_ERROR | error={str(meta_error)}")
                 # ------------------------------------
 
-                session = self._create_session(assistant_config)
+                session = await self._create_session(assistant_config)
                 
                 # Enforce mandatory name and email collection based on settings
                 data_collection = assistant_config.get("dataCollectionSettings", {})
@@ -560,10 +545,10 @@ class CallHandler:
                     assistant_config["prompt"] = f"{current_prompt}\n\n{mandatory_instruction}"
                 
                 # Initialize agent factory with pre-warmed components
+                # Note: LLM/TTS pre-warming is now dynamic per-call
+                vad = await self._ensure_vad()
                 agent_factory = AgentFactory(
-                    self._prewarmed_llms,
-                    self._prewarmed_tts,
-                    self._prewarmed_vad
+                    prewarmed_vad=vad
                 )
                 
                 agent = await agent_factory.create_agent(assistant_config)
@@ -579,6 +564,12 @@ class CallHandler:
                 asyncio.create_task(self._on_user_state_changed(event, session, assistant_config, ctx))
             session.on("user_state_changed", handle_user_state_changed)
 
+            # Register a dummy transcription handler to silence "ignoring text stream" warnings
+            # These occur when server-side transcription is enabled but no callback is attached
+            @ctx.room.on("transcription_received")
+            def on_transcription(transcription, participant=None):
+                pass
+
             # Start the session IMMEDIATELY to begin listening for speech
             async with measure_latency_context("session_start", call_id):
                 # Store room name in agent for transfer operations
@@ -589,7 +580,7 @@ class CallHandler:
                     agent=agent,
                     room=ctx.room,
                     room_input_options=RoomInputOptions(close_on_disconnect=True),
-                    room_output_options=RoomOutputOptions(transcription_enabled=True)  # Enable transcription for better speech recognition
+                    room_output_options=RoomOutputOptions(transcription_enabled=True)  # Enable transcription for dashboard and transcription service
                 )
             # logger.info(f"SESSION_STARTED | room={ctx.room.name} | listening for speech")
             profiler.checkpoint("session_started")
@@ -1372,14 +1363,14 @@ class CallHandler:
             # logger.warning(f"AI_STRUCTURED_DATA_EXTRACTION_ERROR | error={str(e)}")
             return {}
 
-    def _create_session(self, config: Dict[str, Any]) -> AgentSession:
+    async def _create_session(self, config: Dict[str, Any]) -> AgentSession:
         """Create agent session using assistant's database settings."""
         # Validate and fix model names to prevent API errors
         from config.settings import validate_model_names
         config = validate_model_names(config)
         
-        # re-use prewarmed VAD, fallback if missing
-        vad = getattr(self, "_prewarmed_vad", None) or silero.VAD.load()
+        # re-use prewarmed VAD
+        vad = await self._ensure_vad()
 
         # Get configuration from assistant data - optimized for performance
         llm_provider = config.get("llm_provider_setting", "OpenAI")
@@ -1463,15 +1454,15 @@ class CallHandler:
         max_call_duration_seconds = max_call_duration_minutes
 
         # Get voice timing settings from assistant config
-        voice_on_punctuation_seconds = config.get("voice_on_punctuation_seconds", 0.1)      # From DB
-        voice_on_no_punctuation_seconds = config.get("voice_on_no_punctuation_seconds", 1.5)  # From DB
-        voice_on_number_seconds = config.get("voice_on_number_seconds", 0.5)               # From DB
-        voice_backoff_seconds = config.get("voice_backoff_seconds", 1)                      # From DB
+        voice_on_punctuation_seconds = config.get("voice_on_punctuation_seconds", 0.4)      # From DB, default to 0.4s
+        voice_on_no_punctuation_seconds = config.get("voice_on_no_punctuation_seconds", 0.8)  # From DB, default to 0.8s
+        voice_on_number_seconds = config.get("voice_on_number_seconds", 0.4)               # From DB
+        voice_backoff_seconds = config.get("voice_backoff_seconds", 0.8)                      # From DB
 
         # Get interruption threshold settings from assistant config
-        min_interruption_words = config.get("num_words_to_interrupt_assistant", 3)  # From DB, default to 3 words
-        min_interruption_duration = 0.5  # Require at least 0.5 seconds of speech
-        false_interruption_timeout = 2.0  # Wait 2 seconds before signaling false interruption
+        min_interruption_words = config.get("num_words_to_interrupt_assistant", 1)  # From DB, default to 1 word for better responsiveness
+        min_interruption_duration = 0.3  # Require at least 0.3 seconds of speech
+        false_interruption_timeout = 1.0  # Wait 1 second before signaling false interruption
 
         return AgentSession(
             vad=vad,

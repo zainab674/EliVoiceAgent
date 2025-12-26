@@ -144,15 +144,15 @@ const BUSINESS_TEMPLATES = {
 export const inferDataType = async (input: string, businessType: string = 'general'): Promise<DataFieldSuggestion[]> => {
   const suggestions: DataFieldSuggestion[] = [];
   const inputLower = input.toLowerCase();
-  
+
   // Start with business-specific templates if they match
   const businessTemplate = BUSINESS_TEMPLATES[businessType as keyof typeof BUSINESS_TEMPLATES] || BUSINESS_TEMPLATES.general;
-  
+
   // Check if input mentions any business template fields
   for (const template of businessTemplate) {
     const templateWords = template.name.split('_').concat(template.description.toLowerCase().split(' '));
     const hasMatch = templateWords.some(word => inputLower.includes(word.toLowerCase()));
-    
+
     if (hasMatch) {
       suggestions.push({
         ...template,
@@ -162,16 +162,16 @@ export const inferDataType = async (input: string, businessType: string = 'gener
       });
     }
   }
-  
+
   // Pattern-based inference
   for (const [category, pattern] of Object.entries(DATA_PATTERNS)) {
     const hasKeyword = pattern.keywords.some(keyword => inputLower.includes(keyword));
-    
+
     if (hasKeyword) {
       for (const [fieldName, config] of Object.entries(pattern.types)) {
-        const specificMatch = inputLower.includes(fieldName) || 
-                             pattern.keywords.some(k => inputLower.includes(k + ' ' + fieldName) || inputLower.includes(fieldName + ' ' + k));
-        
+        const specificMatch = inputLower.includes(fieldName) ||
+          pattern.keywords.some(k => inputLower.includes(k + ' ' + fieldName) || inputLower.includes(fieldName + ' ' + k));
+
         if (specificMatch) {
           const existingSuggestion = suggestions.find(s => s.name === fieldName || s.name.includes(fieldName));
           if (!existingSuggestion) {
@@ -189,7 +189,7 @@ export const inferDataType = async (input: string, businessType: string = 'gener
       }
     }
   }
-  
+
   // Smart name inference from common phrases
   const nameInferences = [
     { pattern: /customer (name|info|details)/, name: 'Customer Name', type: 'string', confidence: 0.85 },
@@ -200,7 +200,7 @@ export const inferDataType = async (input: string, businessType: string = 'gener
     { pattern: /follow[\s-]?up/, name: 'Follow Up Required', type: 'boolean', confidence: 0.8 },
     { pattern: /next (step|action)/, name: 'Next Action', type: 'string', confidence: 0.8 }
   ];
-  
+
   for (const inference of nameInferences) {
     if (inference.pattern.test(inputLower)) {
       const existingSuggestion = suggestions.find(s => s.name.toLowerCase().includes(inference.name.toLowerCase()));
@@ -216,7 +216,7 @@ export const inferDataType = async (input: string, businessType: string = 'gener
       }
     }
   }
-  
+
   // If no specific patterns matched, provide general suggestions based on common words
   if (suggestions.length === 0) {
     const generalSuggestions = [
@@ -229,16 +229,16 @@ export const inferDataType = async (input: string, businessType: string = 'gener
       },
       {
         name: 'Customer Response',
-        type: 'string', 
+        type: 'string',
         description: 'Capture customer responses and feedback',
         confidence: 0.6,
         extractionHint: 'Customer engagement and response tracking'
       }
     ];
-    
+
     suggestions.push(...generalSuggestions);
   }
-  
+
   // Sort by confidence and limit results
   return suggestions
     .sort((a, b) => b.confidence - a.confidence)

@@ -83,8 +83,9 @@ router.post('/:callId/send-email', async (req, res) => {
 
         // Get linked email credentials
         const linkedEmailId = assistant.dataCollectionSettings?.linkedEmailId;
+        const senderEmail = emailTemplate.sender;
 
-        if (!linkedEmailId) {
+        if ((!linkedEmailId || linkedEmailId === 'none') && !senderEmail) {
             console.error(`[POST-CALL-EMAIL] No email credentials linked for assistant: ${assistant._id}`);
             return res.status(400).json({
                 success: false,
@@ -93,7 +94,7 @@ router.post('/:callId/send-email', async (req, res) => {
         }
 
         // Fetch user and their email credentials
-        const user = await User.findById(assistant.userId);
+        let user = await User.findById(assistant.userId);
 
         if (!user) {
             console.error(`[POST-CALL-EMAIL] User not found: ${assistant.userId}`);
@@ -104,12 +105,45 @@ router.post('/:callId/send-email', async (req, res) => {
         }
 
         // Find the specific email integration
-        const emailIntegration = user.email_integrations.find(
-            integration => integration._id.toString() === linkedEmailId
-        );
+        let emailIntegration = null;
+
+        // Try to find on the assistant's primary user first
+        if (linkedEmailId && linkedEmailId !== 'none') {
+            emailIntegration = user.email_integrations.find(
+                integration => integration._id.toString() === linkedEmailId
+            );
+        }
+
+        // GLOBAL FALLBACK 1: If not found on assistant.userId, search ALL users for this integration ID
+        if (!emailIntegration && linkedEmailId && linkedEmailId !== 'none' && linkedEmailId.length === 24) {
+            const owner = await User.findOne({ "email_integrations._id": linkedEmailId });
+            if (owner) {
+                user = owner;
+                emailIntegration = user.email_integrations.find(
+                    integration => integration._id.toString() === linkedEmailId
+                );
+                if (emailIntegration) {
+                    console.log(`[POST-CALL-EMAIL] Found integration ID ${linkedEmailId} on owner: ${user.email}`);
+                }
+            }
+        }
+
+        // GLOBAL FALLBACK 2: Try matching using the sender email from the template across ALL users
+        if (!emailIntegration && senderEmail) {
+            const owner = await User.findOne({ "email_integrations.email": senderEmail });
+            if (owner) {
+                user = owner;
+                emailIntegration = user.email_integrations.find(
+                    integration => integration.email === senderEmail
+                );
+                if (emailIntegration) {
+                    console.log(`[POST-CALL-EMAIL] Found integration for ${senderEmail} on owner: ${user.email}`);
+                }
+            }
+        }
 
         if (!emailIntegration || !emailIntegration.isActive) {
-            console.error(`[POST-CALL-EMAIL] Email integration not found or inactive: ${linkedEmailId}`);
+            console.error(`[POST-CALL-EMAIL] Email integration not found or inactive. linkedEmailId: ${linkedEmailId}, senderEmail: ${senderEmail}`);
             return res.status(400).json({
                 success: false,
                 message: 'Email credentials not found or inactive'

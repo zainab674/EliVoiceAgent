@@ -237,9 +237,18 @@ export const ModelTab: React.FC<ModelTabProps> = ({ data, onChange }) => {
 
         {/* System Prompt Section */}
         <div className="flex-1 flex flex-col">
-          <label className="block text-base font-semibold tracking-[0.2px] mb-2">
-            System Prompt
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-base font-semibold tracking-[0.2px]">
+              System Prompt
+            </label>
+            <span className="text-[11px] text-primary/80 bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
+              Pro-tip: Mention fields from 'Analysis' tab here to ensure they're collected
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Define your assistant's personality, knowledge, and goals.
+            <span className="text-primary/70 ml-1">Make sure to instruct the assistant when to ask for the data fields you configured in the Analysis tab.</span>
+          </p>
           <Textarea
             placeholder="You are Helen, a professional dental receptionist. You should help patients schedule appointments, answer questions about services, and provide general information about the clinic..."
             value={data.systemPrompt}

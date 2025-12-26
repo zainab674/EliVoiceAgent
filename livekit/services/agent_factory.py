@@ -41,21 +41,38 @@ class AgentFactory:
     async def _classify_data_fields_with_llm(self, structured_data: list) -> Dict[str, list]:
         """Use LLM to classify which fields should be asked vs extracted."""
         try:
+            # First, check for fields that have explicit timing set by the user
+            explicit_ask = []
+            to_classify = []
+            
+            for field in structured_data:
+                timing = field.get("askTiming", "none")
+                if timing in ["start", "middle", "end"]:
+                    explicit_ask.append(field.get("name", ""))
+                else:
+                    to_classify.append(field)
+            
+            if not to_classify:
+                return {
+                    "ask_user": explicit_ask,
+                    "extract_from_conversation": []
+                }
+
             openai_api_key = os.getenv("OPENAI_API_KEY")
             if not openai_api_key:
                 logger.warning("OPENAI_API_KEY not configured for field classification")
-                return {"ask_user": [], "extract_from_conversation": []}
+                return {"ask_user": explicit_ask, "extract_from_conversation": [f.get("name", "") for f in to_classify]}
 
             client = get_openai_client()
             
-            # Prepare field descriptions
+            # Prepare field descriptions for remaining fields
             fields_json = json.dumps([
                 {
                     "name": field.get("name", ""),
                     "description": field.get("description", ""),
                     "type": field.get("type", "string")
                 }
-                for field in structured_data
+                for field in to_classify
             ], indent=2)
             
             classification_prompt = f"""You are analyzing data fields for a voice conversation system. For each field, decide whether it should be:
@@ -91,6 +108,8 @@ Return a JSON object with two arrays. You must respond with valid JSON format on
             # Parse JSON response
             try:
                 classification = json.loads(content)
+                # Combine explicit asks with LLM-suggested asks
+                classification["ask_user"] = list(set(classification.get("ask_user", []) + explicit_ask))
                 logger.info(f"FIELD_CLASSIFICATION_SUCCESS | ask_user={len(classification.get('ask_user', []))} | extract={len(classification.get('extract_from_conversation', []))}")
                 return classification
             except json.JSONDecodeError as e:
@@ -155,13 +174,7 @@ Return a JSON object with two arrays. You must respond with valid JSON format on
             instructions += f' IMPORTANT: Start the conversation by saying exactly: "{first_message}" Do not repeat or modify this greeting.'
             logger.info(f"FIRST_MESSAGE_SET | first_message={first_message}")
 
-        # Log final instructions for debugging
-        # logger.info(f"FINAL_INSTRUCTIONS_LENGTH | length={len(instructions)}")
-        # logger.info(f"FINAL_INSTRUCTIONS_PREVIEW | preview={instructions}...")
-
        
-        
-        # Initialize calendar if credentials are available
         calendar = await self._initialize_calendar(config)
 
       
@@ -170,7 +183,7 @@ Return a JSON object with two arrays. You must respond with valid JSON format on
         instructions += "\n\nDATA COLLECTION TOOLS:\nYou have access to tools for collecting customer information. YOU MUST use these tools when the user provides this information or when you collect it:\n- set_name: Set the customer's name\n- set_email: Set the customer's email\n- set_phone: Set the customer's phone number\n- set_notes: Set notes or summary of the conversation"
         
         # Add email collection instructions for letter-by-letter spelling
-        instructions += "\n\nEMAIL COLLECTION PROTOCOL:\nWhen collecting email addresses, follow this EXACT protocol to ensure accuracy:\n1. Ask the user to spell their email address LETTER BY LETTER\n2. Say: 'Please spell your email address letter by letter.'\n3. Listen carefully as they spell each letter\n4. For special characters, listen for:\n   - 'at' or 'at sign' or '@' for the @ symbol\n   - 'dot' or 'period' or '.' for periods\n   - 'underscore' or 'dash' or 'hyphen' for _ or -\n5. After receiving the spelled email, ALWAYS repeat it back to confirm: 'Let me confirm, your email is [email]? Is that correct?'\n6. Wait for confirmation before calling set_email\n7. If the user says it's incorrect, ask them to spell it again letter by letter\n8. Only call set_email() after the user confirms the email is correct"
+        instructions += "\n\nEMAIL COLLECTION PROTOCOL:\nWhen collecting email addresses, follow this EXACT protocol to ensure accuracy:\n1. Ask the user to spell their email address LETTER BY LETTER\n2. Say: 'Please spell your email address letter by letter.'\n3. Listen carefully as they spell each letter\n4. For special characters, listen for:\n   - 'at' or 'at sign' or '@' for the @ symbol\n   - 'dot' or 'period' or '.' for periods\n   - 'underscore' or 'dash' or 'hyphen' for _ or -\n5. After receiving the spelled email, ALWAYS repeat it back to confirm: 'Let me confirm, your email is [email]? Is that correct?'\n6. Wait for confirmation before calling set_email\n7. If the user says it's incorrect, ask them to spell it again \n8. Only call set_email() after the user confirms the email is correct"
 
         if calendar:
             instructions += "\n\nBOOKING CAPABILITIES:\nYou can help users book appointments. You have access to the following booking tools:\n- list_slots_on_day: Show available appointment slots for a specific day (shows 10 slots by default - use max_options=20 to show more)\n- choose_slot: Select a time slot for the appointment (can use time like '7:00pm' or slot number from list)\n- finalize_booking: Complete the booking when ALL information is collected (time slot, name, email, phone)\n\nCRITICAL BOOKING RULES:\n- ONLY start booking if the user explicitly requests it (e.g., 'I want to book', 'schedule an appointment', 'book a time')\n- Do NOT automatically start booking just because you have contact information (phone, email, name)\n- Do NOT call list_slots_on_day or any booking tools unless the user explicitly asks to book or schedule an appointment\n- Do NOT call finalize_booking or confirm_details until you have: 1) selected time slot, 2) customer name, 3) email, and 4) phone number. Only call ONE of these functions, not both."

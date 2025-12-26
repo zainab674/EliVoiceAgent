@@ -45,12 +45,11 @@ async def build_analysis_instructions(config: Dict[str, Any], classify_data_fiel
                 ask_fields.append(f"- {field.get('name', '')}: {field.get('description', '')} (type: {field.get('type', 'string')})")
         
         if ask_fields:
-            instructions.append("PRIORITY DATA COLLECTION:")
-            instructions.append("You have access to collect_analysis_data(field_name, field_value, field_type) function.")
-            instructions.append("IMPORTANT: Your goal is to collect the following data from the user. Weave questions naturally into the conversation to collect:")
+            instructions.append("DATA COLLECTION FIELDS:")
+            instructions.append("You have access to the collect_analysis_data(field_name, field_value, field_type) function.")
+            instructions.append("Use this tool to record the following information when it is provided or when you ask for it according to your main prompt:")
             instructions.extend(ask_fields)
-            instructions.append("Ask for this information naturally and conversationally. Use collect_analysis_data silently whenever you have a value - this tool completes without requiring a response.")
-            instructions.append("Collect these data fields while maintaining a natural conversation flow. Prioritize basic contact info (Name/Phone/Email) early if missing.")
+            instructions.append("\nFollow your main instructions for the conversation flow regarding when to ask for these details.")
         
         # Build instructions for fields to extract
         extract_fields = []
@@ -60,10 +59,9 @@ async def build_analysis_instructions(config: Dict[str, Any], classify_data_fiel
                 extract_fields.append(f"- {field.get('name', '')}: {field.get('description', '')} (type: {field.get('type', 'string')})")
         
         if extract_fields:
-            instructions.append("\nAI-EXTRACTED FIELDS:")
-            instructions.append("The following fields will be automatically extracted from the conversation using AI analysis:")
+            instructions.append("\nAI-EXTRACTED FIELDS (DO NOT ASK DIRECTLY):")
+            instructions.append("The following fields will be automatically extracted from the conversation. You do not need to ask for these directly:")
             instructions.extend(extract_fields)
-            instructions.append("Do not ask the user for meta-data fields (like sentiment or call outcome) directly. However, for business-specific information in this list, you may guide the conversation to uncover it naturally.")
     
     return "\n".join(instructions) if instructions else ""
 

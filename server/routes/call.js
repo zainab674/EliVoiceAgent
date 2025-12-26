@@ -13,7 +13,8 @@ import Assistant from '../models/Assistant.js';
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const { limit = 50, assistant_id } = req.query;
-        const parsedLimit = parseInt(limit);
+        let parsedLimit = parseInt(limit);
+        if (isNaN(parsedLimit)) parsedLimit = 50;
 
         // Find assistants that belong to this user (either owned or assigned by email)
         const assistants = await Assistant.find({
@@ -24,21 +25,28 @@ router.get('/', authenticateToken, async (req, res) => {
         }).select('_id');
         const assistantIds = assistants.map(a => a._id.toString());
 
-        const query = {
-            $or: [
-                { user_id: req.user.id },
-                { assistant_id: { $in: assistantIds } }
-            ]
-        };
+        let query = {};
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'super-admin';
 
-        // If specific assistant is requested, override the query
+        // If not admin, restrict to user's own data or assistants they have access to
+        if (!isAdmin) {
+            query = {
+                $or: [
+                    { user_id: req.user.id },
+                    { assistant_id: { $in: assistantIds } }
+                ]
+            };
+        }
+
+        // If specific assistant is requested, filter by it
         if (assistant_id) {
-            query.assistant_id = assistant_id;
-            // Also ensure it belongs to the user
-            if (!assistantIds.includes(assistant_id) && req.user.role !== 'admin') {
+            // Also ensure it belongs to the user if not admin
+            if (!isAdmin && !assistantIds.includes(assistant_id)) {
                 return res.status(403).json({ success: false, error: 'Access denied to this assistant' });
             }
-            delete query.$or;
+            query.assistant_id = assistant_id;
+            // Clean up the $or if we are filtering by a specific assistant
+            if (query.$or) delete query.$or;
         }
 
         const calls = await Call.find(query)
@@ -67,7 +75,16 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const call = await Call.findOne({ _id: id, user_id: req.user.id });
+        let query = { _id: id };
+
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'super-admin';
+
+        // If not admin, restrict to user's own data
+        if (!isAdmin) {
+            query.user_id = req.user.id;
+        }
+
+        const call = await Call.findOne(query);
 
         if (!call) {
             return res.status(404).json({ success: false, error: 'Call not found' });
