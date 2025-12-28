@@ -201,7 +201,9 @@ class DatabaseClient:
             # Email & Documents
             "email_templates": doc.get("email_templates", {}),
             "assigned_documents": doc.get("assigned_documents", []),
-            "dataCollectionSettings": doc.get("dataCollectionSettings", {})
+            "dataCollectionSettings": doc.get("dataCollectionSettings", {}),
+            "nodes": doc.get("nodes", []),
+            "edges": doc.get("edges", [])
         }
         return flat
     

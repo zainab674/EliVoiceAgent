@@ -29,6 +29,14 @@ const assistantSchema = new mongoose.Schema({
         lowercase: true,
         trim: true
     },
+    nodes: {
+        type: mongoose.Schema.Types.Mixed,
+        default: []
+    },
+    edges: {
+        type: mongoose.Schema.Types.Mixed,
+        default: []
+    },
     systemPrompt: {
         type: String,
         default: 'You are a helpful legal assistant.'

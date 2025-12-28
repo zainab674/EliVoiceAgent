@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Sparkles, Trash2, Edit3, Settings, Mic, MessageSquare, CheckCircle2, FileText, Files, Mail } from "lucide-react";
+import { ArrowLeft, Sparkles, Trash2, Edit3, Settings, Mic, MessageSquare, CheckCircle2, FileText, Files, Mail, Workflow as WorkflowIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +29,7 @@ import { EmailTab } from "@/components/assistants/wizard/EmailTab";
 import { AnalysisTab } from "@/components/assistants/wizard/AnalysisTab";
 import { AssistantFormData } from "@/components/assistants/wizard/types";
 import { useAuth } from "@/contexts/SupportAccessAuthContext";
+import { WorkflowTab } from "@/components/assistants/wizard/WorkflowTab";
 
 const tabVariants = {
   initial: { opacity: 0, y: 10 },
@@ -64,6 +65,7 @@ const CreateAssistant = () => {
     { id: "intake", label: "Capabilities", icon: FileText },
     { id: "documents", label: "Documents", icon: Files },
     { id: "email", label: "Email", icon: Mail },
+    { id: "flow", label: "Conversation Flow", icon: WorkflowIcon },
   ];
 
   const searchParams = new URLSearchParams(location.search);
@@ -177,7 +179,9 @@ const CreateAssistant = () => {
       subject: "",
       body: "",
       fromEmail: ""
-    }
+    },
+    nodes: [],
+    edges: []
   });
 
   const handleFormDataChange = (section: keyof AssistantFormData, data: any) => {
@@ -322,7 +326,9 @@ const CreateAssistant = () => {
               subject: data.email_templates?.post_call?.subject || "Information from our call",
               body: data.email_templates?.post_call?.body || "Hi, thanks for speaking with us. Here are the documents you requested.",
               fromEmail: data.email_templates?.post_call?.sender || ""
-            }
+            },
+            nodes: Array.isArray(data.nodes) ? data.nodes : [],
+            edges: Array.isArray(data.edges) ? data.edges : []
           });
         }
       } catch (error: any) {
@@ -370,7 +376,9 @@ const CreateAssistant = () => {
             body: formData.emailTemplate.body,
             sender: formData.emailTemplate.fromEmail
           }
-        }
+        },
+        nodes: formData.nodes,
+        edges: formData.edges
       };
 
       // Debug: Log the payload
@@ -640,6 +648,15 @@ const CreateAssistant = () => {
                           documents={formData.assigned_documents}
                           onChange={(data) => handleFormDataChange('emailTemplate', data)}
                         />
+                      )}
+                      {activeTab === "flow" && (
+                        <div className="space-y-6 sm:space-y-8 h-full">
+                          <WorkflowTab
+                            nodes={formData.nodes}
+                            edges={formData.edges}
+                            onChange={(data) => setFormData(prev => ({ ...prev, nodes: data.nodes, edges: data.edges }))}
+                          />
+                        </div>
                       )}
 
 
