@@ -170,6 +170,7 @@ export interface AssistantFormData {
     fromEmail: string; // The selected connected email
   };
   analysis: AnalysisData;
+  advanced: AdvancedData;
   nodes?: any[];
   edges?: any[];
 }

@@ -184,7 +184,7 @@ class DatabaseClient:
             "end_call_message": advanced_settings.get("endCallMessage", ""),
             "transfer_enabled": advanced_settings.get("transferEnabled", False),
             "transfer_phone_number": advanced_settings.get("transferPhoneNumber", ""),
-            "transfer_country_code": advanced_settings.get("transferCountryCode", ""),
+            "transfer_country_code": advanced_settings.get("transferCountryCode", "+1"),
             "transfer_sentence": advanced_settings.get("transferSentence", ""),
             "transfer_condition": advanced_settings.get("transferCondition", ""),
             

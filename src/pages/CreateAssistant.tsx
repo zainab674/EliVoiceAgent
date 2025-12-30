@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Sparkles, Trash2, Edit3, Settings, Mic, MessageSquare, CheckCircle2, FileText, Files, Mail, Workflow as WorkflowIcon } from "lucide-react";
+import { ArrowLeft, Sparkles, Trash2, Edit3, Settings, Mic, MessageSquare, CheckCircle2, FileText, Files, Mail, Workflow as WorkflowIcon, ArrowRightLeft } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +30,7 @@ import { AnalysisTab } from "@/components/assistants/wizard/AnalysisTab";
 import { AssistantFormData } from "@/components/assistants/wizard/types";
 import { useAuth } from "@/contexts/SupportAccessAuthContext";
 import { WorkflowTab } from "@/components/assistants/wizard/WorkflowTab";
+import { AdvancedTab } from "@/components/assistants/wizard/AdvancedTab";
 
 const tabVariants = {
   initial: { opacity: 0, y: 10 },
@@ -66,6 +67,7 @@ const CreateAssistant = () => {
     { id: "documents", label: "Documents", icon: Files },
     { id: "email", label: "Email", icon: Mail },
     { id: "flow", label: "Conversation Flow", icon: WorkflowIcon },
+    { id: "advanced", label: "Advanced", icon: ArrowRightLeft },
   ];
 
   const searchParams = new URLSearchParams(location.search);
@@ -181,7 +183,27 @@ const CreateAssistant = () => {
       fromEmail: ""
     },
     nodes: [],
-    edges: []
+    edges: [],
+    advanced: {
+      hipaaCompliant: false,
+      pciCompliant: false,
+      recordingEnabled: false,
+      audioRecordingFormat: "wav",
+      videoRecordingEnabled: false,
+      endCallMessage: "",
+      endCallPhrases: [],
+      responseDelaySeconds: 0,
+      llmRequestDelaySeconds: 0,
+      numWordsToInterruptAssistant: 2,
+      maxDurationSeconds: 1800,
+      backgroundSound: "none",
+      voicemailDetectionEnabled: false,
+      transferEnabled: false,
+      transferPhoneNumber: "",
+      transferCountryCode: "+1",
+      transferSentence: "",
+      transferCondition: ""
+    }
   });
 
   const handleFormDataChange = (section: keyof AssistantFormData, data: any) => {
@@ -328,7 +350,28 @@ const CreateAssistant = () => {
               fromEmail: data.email_templates?.post_call?.sender || ""
             },
             nodes: Array.isArray(data.nodes) ? data.nodes : [],
-            edges: Array.isArray(data.edges) ? data.edges : []
+            edges: Array.isArray(data.edges) ? data.edges : [],
+            advanced: {
+              hipaaCompliant: data.advancedSettings?.hipaaCompliant || false,
+              pciCompliant: data.advancedSettings?.pciCompliant || false,
+              recordingEnabled: data.advancedSettings?.recordingEnabled || false,
+              audioRecordingFormat: data.advancedSettings?.audioRecordingFormat || "wav",
+              videoRecordingEnabled: data.advancedSettings?.videoRecordingEnabled || false,
+              endCallMessage: data.advancedSettings?.endCallMessage || "",
+              endCallPhrases: data.advancedSettings?.endCallPhrases || [],
+              responseDelaySeconds: data.advancedSettings?.responseDelaySeconds || 0,
+              llmRequestDelaySeconds: data.advancedSettings?.llmRequestDelaySeconds || 0,
+              numWordsToInterruptAssistant: data.advancedSettings?.numWordsToInterruptAssistant || 2,
+              maxDurationSeconds: data.advancedSettings?.maxDurationSeconds || 1800,
+              backgroundSound: data.advancedSettings?.backgroundSound || "none",
+              voicemailDetectionEnabled: data.advancedSettings?.voicemailDetectionEnabled || false,
+              voicemailMessage: data.advancedSettings?.voicemailMessage || "",
+              transferEnabled: data.advancedSettings?.transferEnabled || false,
+              transferPhoneNumber: data.advancedSettings?.transferPhoneNumber || "",
+              transferCountryCode: data.advancedSettings?.transferCountryCode || "+1",
+              transferSentence: data.advancedSettings?.transferSentence || "",
+              transferCondition: data.advancedSettings?.transferCondition || ""
+            }
           });
         }
       } catch (error: any) {
@@ -369,6 +412,7 @@ const CreateAssistant = () => {
         smsSettings: formData.sms,
         analysisSettings: formData.analysis,
         dataCollectionSettings: formData.dataCollection,
+        advancedSettings: formData.advanced,
         assigned_documents: formData.assigned_documents,
         email_templates: {
           post_call: {
@@ -647,6 +691,12 @@ const CreateAssistant = () => {
                           assistantName={formData.name}
                           documents={formData.assigned_documents}
                           onChange={(data) => handleFormDataChange('emailTemplate', data)}
+                        />
+                      )}
+                      {activeTab === "advanced" && (
+                        <AdvancedTab
+                          data={formData.advanced}
+                          onChange={(data) => handleFormDataChange('advanced', data)}
                         />
                       )}
                       {activeTab === "flow" && (

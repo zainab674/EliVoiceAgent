@@ -214,7 +214,7 @@ def build_workflow_instructions(config: Dict[str, Any]) -> str:
         elif node_type in ["END", "TERMINATE"]:
             instructions.append("   - ACTION: POLITELY END THE CALL")
         elif node_type == "TRANSFER":
-            instructions.append("   - ACTION: INITIATE CALL TRANSFER")
+            instructions.append("   - ACTION: Use the transfer_required() tool IMMEDIATELY to transfer the call to the configured department or agent.")
 
     instructions.append("\n3. RULES FOR EXECUTION:")
     instructions.append("- Always keep track of your CURRENT STATE ID.")

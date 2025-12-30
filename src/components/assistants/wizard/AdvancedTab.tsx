@@ -60,7 +60,119 @@ export const AdvancedTab: React.FC<AdvancedTabProps> = ({ data, onChange }) => {
 
   return (
     <div className="max-w-4xl space-y-[var(--space-2xl)]">
-     
+      {/* Privacy & Security */}
+      <Card variant="default">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <h3 className="text-lg font-medium">Privacy & Security</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Configure compliance and recording settings
+            </p>
+          </div>
+          <Shield className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+        <CardContent className="space-y-[var(--space-xl)]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--space-xl)]">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">HIPAA Compliant</Label>
+                <p className="text-xs text-muted-foreground">Enable HIPAA compliance mode</p>
+              </div>
+              <Switch
+                checked={data.hipaaCompliant}
+                onCheckedChange={(checked) => onChange({ hipaaCompliant: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">PCI Compliant</Label>
+                <p className="text-xs text-muted-foreground">Enable PCI compliance mode</p>
+              </div>
+              <Switch
+                checked={data.pciCompliant}
+                onCheckedChange={(checked) => onChange({ pciCompliant: checked })}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-[var(--space-md)]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-[var(--space-md)]">
+                <Mic className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <Label className="text-sm font-medium">Recording Enabled</Label>
+                  <p className="text-xs text-muted-foreground">Record calls for quality and training</p>
+                </div>
+              </div>
+              <Switch
+                checked={data.recordingEnabled}
+                onCheckedChange={(checked) => onChange({ recordingEnabled: checked })}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Response Settings */}
+      <Card variant="default">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <h3 className="text-lg font-medium">Response Settings</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Fine-tune how the assistant interacts
+            </p>
+          </div>
+          <MessageSquare className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+        <CardContent className="space-y-[var(--space-xl)]">
+          <div className="space-y-[var(--space-md)]">
+            <Label className="text-sm font-medium">End Call Message</Label>
+            <p className="text-xs text-muted-foreground mb-[var(--space-md)]">
+              What the assistant says right before hanging up
+            </p>
+            <Textarea
+              placeholder="Thank you for calling. Have a great day!"
+              value={data.endCallMessage || ""}
+              onChange={(e) => onChange({ endCallMessage: e.target.value })}
+              rows={2}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--space-xl)]">
+            <div className="space-y-[var(--space-md)]">
+              <Label className="text-sm font-medium">Interruption Sensitivity</Label>
+              <p className="text-xs text-muted-foreground">How many words to trigger an interruption</p>
+              <WizardSlider
+                value={data.numWordsToInterruptAssistant || 2}
+                onChange={(val) => onChange({ numWordsToInterruptAssistant: val })}
+                max={5}
+                min={1}
+                step={1}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>Sensitive</span>
+                <span>Balanced</span>
+                <span>Firm</span>
+              </div>
+            </div>
+
+            <div className="space-y-[var(--space-md)]">
+              <Label className="text-sm font-medium">Max Call Duration (min)</Label>
+              <p className="text-xs text-muted-foreground">Maximum length of a single call</p>
+              <WizardSlider
+                value={Math.floor((data.maxDurationSeconds || 600) / 60)}
+                onChange={(val) => onChange({ maxDurationSeconds: val * 60 })}
+                max={60}
+                min={1}
+                step={1}
+              />
+              <div className="text-center text-xs text-muted-foreground mt-1">
+                {Math.floor((data.maxDurationSeconds || 600) / 60)} minutes
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Call Transfer */}
       <Card variant="default">
@@ -71,17 +183,16 @@ export const AdvancedTab: React.FC<AdvancedTabProps> = ({ data, onChange }) => {
               Configure call transfer settings to route calls to another number
             </p>
           </div>
-          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+          <ArrowRightLeft className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent className="space-y-[var(--space-xl)]">
-          {/* Enable Transfer */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-[var(--space-md)]">
-              <ArrowRightLeft className="h-5 w-5 text-muted-foreground" />
+              <Phone className="h-5 w-5 text-muted-foreground" />
               <div>
                 <Label className="text-sm font-medium">Enable Call Transfer</Label>
                 <p className="text-xs text-muted-foreground">
-                  Allow the assistant to transfer calls to another number when conditions are met
+                  Allow the assistant to transfer calls to another number
                 </p>
               </div>
             </div>
@@ -92,103 +203,84 @@ export const AdvancedTab: React.FC<AdvancedTabProps> = ({ data, onChange }) => {
           </div>
 
           {data.transferEnabled && (
-            <>
-          {/* Transfer Phone Number */}
-          <div className="space-y-[var(--space-md)]">
-            <Label className="text-sm font-medium">Phone Number</Label>
-            <p className="text-xs text-muted-foreground mb-[var(--space-md)]">
-              The phone number to transfer calls to when transfer conditions are met
-            </p>
-            <div className="flex gap-2">
-              <Popover open={isCountryDropdownOpen} onOpenChange={setIsCountryDropdownOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={isCountryDropdownOpen}
-                    className="w-24 h-12 justify-between text-left font-normal"
-                  >
-                    {selectedCountry ? `${selectedCountry.flag} ${selectedCountry.code}` : "+1"}
-                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search country..." />
-                    <CommandList>
-                      <CommandEmpty>No country found.</CommandEmpty>
-                      <CommandGroup>
-                        {countries.map((country) => (
-                          <CommandItem
-                            key={country.code}
-                            value={`${country.name} ${country.code}`}
-                            onSelect={() => {
-                              onChange({ transferCountryCode: country.code });
-                              setIsCountryDropdownOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                (data.transferCountryCode || "+1") === country.code ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            <span className="mr-2">{country.flag}</span>
-                            <span className="mr-2">{country.code}</span>
-                            <span className="text-muted-foreground">{country.name}</span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <Input
-                placeholder="Phone number"
-                value={data.transferPhoneNumber || ""}
-                onChange={(e) => onChange({ transferPhoneNumber: e.target.value })}
-                className="flex-1 h-12"
-              />
+            <div className="space-y-[var(--space-xl)] pt-4 border-t">
+              <div className="space-y-[var(--space-md)]">
+                <Label className="text-sm font-medium">Phone Number</Label>
+                <div className="flex gap-2">
+                  <Popover open={isCountryDropdownOpen} onOpenChange={setIsCountryDropdownOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-24 h-12 justify-between"
+                      >
+                        {selectedCountry ? `${selectedCountry.flag} ${selectedCountry.code}` : "+1"}
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search country..." />
+                        <CommandList>
+                          <CommandEmpty>No country found.</CommandEmpty>
+                          <CommandGroup>
+                            {countries.map((country) => (
+                              <CommandItem
+                                key={country.code}
+                                value={`${country.name} ${country.code}`}
+                                onSelect={() => {
+                                  onChange({ transferCountryCode: country.code });
+                                  setIsCountryDropdownOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${(data.transferCountryCode || "+1") === country.code ? "opacity-100" : "opacity-0"
+                                    }`}
+                                />
+                                <span className="mr-2">{country.flag}</span>
+                                <span className="mr-2">{country.code}</span>
+                                <span className="text-muted-foreground">{country.name}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <Input
+                    placeholder="Phone number"
+                    value={data.transferPhoneNumber || ""}
+                    onChange={(e) => onChange({ transferPhoneNumber: e.target.value })}
+                    className="flex-1 h-12"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-[var(--space-md)]">
+                <Label className="text-sm font-medium">Transfer Sentence</Label>
+                <Textarea
+                  placeholder="I'm going to transfer you to someone who can better help you with that..."
+                  value={data.transferSentence || ""}
+                  onChange={(e) => onChange({ transferSentence: e.target.value })}
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-[var(--space-md)]">
+                <Label className="text-sm font-medium">Transfer Condition</Label>
+                <Textarea
+                  placeholder="Transfer when the customer asks to speak to a manager..."
+                  value={data.transferCondition || ""}
+                  onChange={(e) => onChange({ transferCondition: e.target.value })}
+                  rows={2}
+                />
+              </div>
             </div>
-          </div>
-
-          {/* Transfer Sentence */}
-          <div className="space-y-[var(--space-md)]">
-            <Label className="text-sm font-medium">Transfer Sentence</Label>
-            <p className="text-xs text-muted-foreground mb-[var(--space-md)]">
-              What the assistant will say before transferring the call
-            </p>
-            <Textarea
-              placeholder="I'm going to transfer you to someone who can better help you with that..."
-              value={data.transferSentence || ""}
-              onChange={(e) => onChange({ transferSentence: e.target.value })}
-              rows={2}
-              className="w-full"
-            />
-          </div>
-
-          {/* Transfer Condition */}
-          <div className="space-y-[var(--space-md)]">
-            <Label className="text-sm font-medium">Transfer Condition</Label>
-            <p className="text-xs text-muted-foreground mb-[var(--space-md)]">
-              Describe when the assistant should transfer the call
-            </p>
-            <Textarea
-              placeholder="Transfer when the customer asks to speak to a manager or requests technical support..."
-              value={data.transferCondition || ""}
-              onChange={(e) => onChange({ transferCondition: e.target.value })}
-              rows={2}
-              className="w-full"
-            />
-          </div>
-
-         
-            </>
           )}
         </CardContent>
       </Card>
 
 
-    
+
     </div>
   );
 };
