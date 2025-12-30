@@ -73,7 +73,9 @@ router.post('/', protect, async (req, res) => {
             dataCollectionSettings,
             assigned_documents,
             email_templates,
-            assignedUserEmail
+            assignedUserEmail,
+            nodes,
+            edges
         } = req.body;
 
         if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
@@ -104,7 +106,9 @@ router.post('/', protect, async (req, res) => {
             n8nSettings,
             dataCollectionSettings,
             assigned_documents,
-            email_templates
+            email_templates,
+            nodes,
+            edges
         });
 
         const createdAssistant = await assistant.save();
@@ -133,7 +137,9 @@ router.put('/:id', protect, async (req, res) => {
             dataCollectionSettings,
             assigned_documents,
             email_templates,
-            assignedUserEmail
+            assignedUserEmail,
+            nodes,
+            edges
         } = req.body;
 
         if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
@@ -219,6 +225,8 @@ router.put('/:id', protect, async (req, res) => {
             assistant.advancedSettings = advancedSettings || assistant.advancedSettings;
             assistant.n8nSettings = n8nSettings || assistant.n8nSettings;
             assistant.dataCollectionSettings = dataCollectionSettings || assistant.dataCollectionSettings;
+            assistant.nodes = nodes || assistant.nodes;
+            assistant.edges = edges || assistant.edges;
 
             // Only update assigned_documents if it's provided and valid
             if (assigned_documents !== undefined) {
