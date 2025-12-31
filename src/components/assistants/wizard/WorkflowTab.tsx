@@ -277,7 +277,7 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({ nodes: initialNodes = 
     };
 
     return (
-        <div className="h-[600px] w-full relative group/flow rounded-3xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-[#f8fafc] dark:bg-zinc-950/20">
+        <div className="h-[800px] w-full relative group/flow rounded-3xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-[#f8fafc] dark:bg-zinc-950/20">
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -323,7 +323,7 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({ nodes: initialNodes = 
 
             {/* Node Details Dialog */}
             <Dialog open={nodeDialogOpen} onOpenChange={setNodeDialogOpen}>
-                <DialogContent className="max-w-2xl bg-white dark:bg-zinc-900 border-border/40 rounded-[2rem] p-8">
+                <DialogContent className="max-w-[95vw] w-full bg-white dark:bg-zinc-900 border-border/40 rounded-[2rem] p-8">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
                             <Settings className="h-6 w-6 text-indigo-500" />
@@ -368,7 +368,7 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({ nodes: initialNodes = 
 
             {/* Connection Dialog */}
             <Dialog open={conditionalDialogOpen} onOpenChange={setConditionalDialogOpen}>
-                <DialogContent className="bg-white dark:bg-zinc-900 border-border/40 rounded-[2rem] p-8">
+                <DialogContent className="max-w-[95vw] w-full bg-white dark:bg-zinc-900 border-border/40 rounded-[2rem] p-8">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-black tracking-tight">Set Transition Logic</DialogTitle>
                     </DialogHeader>

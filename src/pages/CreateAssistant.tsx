@@ -630,7 +630,7 @@ const CreateAssistant = () => {
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto bg-muted/20">
-              <div className="max-w-6xl mx-auto p-8">
+              <div className="max-w-[1920px] mx-auto p-8">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-24">
                     <div className="text-center">
