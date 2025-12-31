@@ -24,17 +24,14 @@ export const VoiceTab: React.FC<VoiceTabProps> = ({ data, onChange }) => {
     const updates: Partial<VoiceData> = {};
     if (data.provider !== "Cartesia") {
       updates.provider = "Cartesia";
-    }
-    if (data.model !== "sonic-3") {
       updates.model = "sonic-3";
-    }
-    if (data.voice !== "41468051-3a85-4b68-92ad-64add250d369") {
       updates.voice = "41468051-3a85-4b68-92ad-64add250d369";
     }
+
     if (Object.keys(updates).length > 0) {
       onChange(updates);
     }
-  }, [data.provider, data.model, data.voice, onChange]);
+  }, [data.provider, onChange]);
 
   // Filter voices based on selected provider
   const getFilteredVoices = () => {
@@ -315,18 +312,18 @@ export const VoiceTab: React.FC<VoiceTabProps> = ({ data, onChange }) => {
 
     const filteredVoices = getFilteredVoicesForProvider(value);
     const filteredModels = getFilteredModelsForProvider(value);
-    
+
     // Check if current voice is valid for new provider
     const isCurrentVoiceValid = filteredVoices.some(voice => voice.value === data.voice);
     const isCurrentModelValid = filteredModels.some(model => model.value === data.model);
-    
+
     const updates: Partial<VoiceData> = { provider: value };
-    
+
     // Reset model if not valid for new provider
     if (!isCurrentModelValid && filteredModels.length > 0) {
       updates.model = filteredModels[0].value;
     }
-    
+
     // Reset voice if not valid for new provider
     // For Deepgram, voice should match the model
     if (value === "Deepgram" && filteredModels.length > 0) {
@@ -337,24 +334,24 @@ export const VoiceTab: React.FC<VoiceTabProps> = ({ data, onChange }) => {
     } else if (!isCurrentVoiceValid && filteredVoices.length > 0) {
       updates.voice = filteredVoices[0].value;
     }
-    
+
     onChange(updates);
   };
 
-    // Handle model change and reset voice if needed
+  // Handle model change and reset voice if needed
   const handleModelChange = (value: string) => {
     // For Deepgram, model and voice are the same
     if (data.provider === "Deepgram") {
       onChange({ model: value, voice: value });
       return;
     }
-    
+
     // For Cartesia, use first voice when model changes
     if (data.provider === "Cartesia") {
       onChange({ model: value, voice: "41468051-3a85-4b68-92ad-64add250d369" });
       return;
     }
-    
+
     // For Rime, check if current voice is valid for the new model
     if (data.provider === "Rime") {
       // Determine available voices for the new model
@@ -388,18 +385,18 @@ export const VoiceTab: React.FC<VoiceTabProps> = ({ data, onChange }) => {
           { value: "destin", label: "Destin" }
         ];
       }
-      
+
       const isCurrentVoiceValid = availableVoices.some(voice => voice.value === data.voice);
-      
+
       const updates: Partial<VoiceData> = { model: value };
-      
+
       // Reset voice if not valid for new model
       if (!isCurrentVoiceValid && availableVoices.length > 0) {
         updates.voice = availableVoices[0].value;
       }
-      
+
       onChange(updates);
-    } 
+    }
     // For Hume, use default voices only (Octave-2 disabled)
     else if (data.provider === "Hume") {
       const defaultVoices = [
@@ -413,16 +410,16 @@ export const VoiceTab: React.FC<VoiceTabProps> = ({ data, onChange }) => {
         { value: "Conversational English Guy", label: "Conversational English Guy" },
         { value: "English Casual Conversationalist", label: "English Casual Conversationalist" }
       ];
-      
+
       const isCurrentVoiceValid = defaultVoices.some(voice => voice.value === data.voice);
-      
+
       const updates: Partial<VoiceData> = { model: value };
-      
+
       // Reset voice if not valid for new model
       if (!isCurrentVoiceValid && defaultVoices.length > 0) {
         updates.voice = defaultVoices[0].value;
       }
-      
+
       onChange(updates);
     } else {
       onChange({ model: value });
@@ -456,8 +453,8 @@ export const VoiceTab: React.FC<VoiceTabProps> = ({ data, onChange }) => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  
-                  
+
+
                   <SelectItem value="Cartesia">Cartesia</SelectItem>
                 </SelectContent>
               </Select>
@@ -496,7 +493,7 @@ export const VoiceTab: React.FC<VoiceTabProps> = ({ data, onChange }) => {
             </div>
           </div>
 
-          
+
         </CardContent>
       </Card>
 
@@ -525,16 +522,16 @@ export const VoiceTab: React.FC<VoiceTabProps> = ({ data, onChange }) => {
               </Select>
             </div>
 
-         
+
           </div>
 
 
-         
+
         </CardContent>
       </Card>
 
-     
-     
+
+
 
     </div>
   );
