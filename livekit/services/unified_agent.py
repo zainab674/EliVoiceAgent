@@ -774,7 +774,7 @@ class UnifiedAgent(Agent):
                 missing_fields.append("phone")
             
             logging.warning("FINALIZE_BOOKING_MISSING_FIELDS | missing=%s", missing_fields)
-            return f"We need to collect all the details first. We're missing: {', '.join(missing_fields)}. Let me help you with that."
+            return f"We need to collect all the details first. We're missing: {', '.join(missing_fields)}."
         
         self._booking_data.confirmed = True
         msg = self._require_calendar()
