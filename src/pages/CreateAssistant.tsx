@@ -704,7 +704,37 @@ const CreateAssistant = () => {
                           <WorkflowTab
                             nodes={formData.nodes}
                             edges={formData.edges}
-                            onChange={(data) => setFormData(prev => ({ ...prev, nodes: data.nodes, edges: data.edges }))}
+                            onChange={(data) => {
+                              const startNode = data.nodes.find(n => n.type === 'start');
+                              setFormData(prev => {
+                                const updates: any = { nodes: data.nodes, edges: data.edges };
+                                if (startNode) {
+                                  // Extract data from start node
+                                  const newFirstDialogue = startNode.data.first_dialogue;
+                                  const newInputPrompt = startNode.data.input_prompt;
+
+                                  // Check if we need to sync with model settings
+                                  // Only update if values are defined and different to avoid unnecessary re-renders
+                                  const currentFirstMessage = prev.model.firstMessage;
+                                  const currentSystemPrompt = prev.model.systemPrompt;
+
+                                  if ((newFirstDialogue !== undefined && newFirstDialogue !== currentFirstMessage) ||
+                                    (newInputPrompt !== undefined && newInputPrompt !== currentSystemPrompt)) {
+
+                                    updates.model = {
+                                      ...prev.model,
+                                      ...(newFirstDialogue !== undefined && { firstMessage: newFirstDialogue }),
+                                      ...(newInputPrompt !== undefined && { systemPrompt: newInputPrompt })
+                                    };
+
+                                    // Also sync top-level fields if they exist there
+                                    updates.firstMessage = newFirstDialogue !== undefined ? newFirstDialogue : prev.model.firstMessage;
+                                    updates.systemPrompt = newInputPrompt !== undefined ? newInputPrompt : prev.model.systemPrompt;
+                                  }
+                                }
+                                return { ...prev, ...updates };
+                              });
+                            }}
                           />
                         </div>
                       )}

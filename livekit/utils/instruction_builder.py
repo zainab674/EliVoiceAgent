@@ -140,6 +140,8 @@ def build_workflow_instructions(config: Dict[str, Any]) -> str:
             "title": data.get("title") or node.get("title") or node.get("id"),
             "input_prompt": data.get("input_prompt") or data.get("prompt") or node.get("input_prompt") or "",
             "first_dialogue": data.get("first_dialogue") or data.get("dialogue") or node.get("first_dialogue") or "",
+            "question": data.get("question") or "",
+            "fieldName": data.get("fieldName") or "",
             "transitions": []
         }
         
@@ -198,9 +200,16 @@ def build_workflow_instructions(config: Dict[str, Any]) -> str:
         title = node["title"]
         prompt = node["input_prompt"]
         dialogue = node["first_dialogue"]
+        question = node.get("question")
+        field_name = node.get("fieldName")
         node_type = node["type"].upper()
         
         instructions.append(f"\n[{node_id}] - {title}:")
+        
+        if node_type == "QUESTION":
+             instructions.append(f"   - CORE INSTRUCTION: Ask the user \"{question}\"")
+             instructions.append(f"   - DATA ACTION: When the user provides the {field_name}, you MUST call collect_analysis_data(field_name='{field_name}', field_value=USER_RESPONSE, field_type='string')")
+             
         if prompt:
             instructions.append(f"   - CORE INSTRUCTION: {prompt}")
         if dialogue:
