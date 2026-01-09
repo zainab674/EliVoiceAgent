@@ -73,6 +73,7 @@ router.post('/', protect, async (req, res) => {
             dataCollectionSettings,
             assigned_documents,
             email_templates,
+            emailReplyPrompt,
             assignedUserEmail,
             nodes,
             edges
@@ -107,6 +108,7 @@ router.post('/', protect, async (req, res) => {
             dataCollectionSettings,
             assigned_documents,
             email_templates,
+            emailReplyPrompt,
             nodes,
             edges
         });
@@ -137,6 +139,7 @@ router.put('/:id', protect, async (req, res) => {
             dataCollectionSettings,
             assigned_documents,
             email_templates,
+            emailReplyPrompt,
             assignedUserEmail,
             nodes,
             edges
@@ -225,6 +228,7 @@ router.put('/:id', protect, async (req, res) => {
             assistant.advancedSettings = advancedSettings || assistant.advancedSettings;
             assistant.n8nSettings = n8nSettings || assistant.n8nSettings;
             assistant.dataCollectionSettings = dataCollectionSettings || assistant.dataCollectionSettings;
+            assistant.emailReplyPrompt = emailReplyPrompt !== undefined ? emailReplyPrompt : assistant.emailReplyPrompt;
             assistant.nodes = nodes || assistant.nodes;
             assistant.edges = edges || assistant.edges;
 

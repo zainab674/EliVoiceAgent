@@ -189,6 +189,11 @@ class CallHandler:
         
         # Track idle message counts per session
         self._idle_message_counts = {}
+        
+        # Latency monitoring variables
+        self.end_of_utterance_delay = 0
+        self.llm_latency = 0
+        self.tts_latency = 0
 
     async def _ensure_vad(self):
         """Ensure VAD is loaded (singleton-ish)."""

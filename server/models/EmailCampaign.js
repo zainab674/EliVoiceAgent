@@ -43,10 +43,19 @@ const emailCampaignSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    link: {
+        type: String
+    },
     attachmentPath: {
         type: String
     },
     attachmentOriginalName: {
+        type: String
+    },
+    imagePath: {
+        type: String
+    },
+    imageOriginalName: {
         type: String
     },
 

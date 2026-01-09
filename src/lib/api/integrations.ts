@@ -54,5 +54,49 @@ export const IntegrationService = {
         });
         if (!response.ok) throw new Error('Failed to remove email integration');
         return response.json();
+    },
+
+    async connectMongoDB(data: any) {
+        const isFormData = data instanceof FormData;
+        const response = await fetch('/api/v1/integrations/mongodb', {
+            method: 'POST',
+            headers: {
+                ...getAuthHeader(),
+                ...(isFormData ? {} : { 'Content-Type': 'application/json' })
+            },
+            body: isFormData ? data : JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || 'Failed to connect MongoDB');
+        }
+        return response.json();
+    },
+
+    async triggerMongoDBSync(configId: string) {
+        const response = await fetch(`/api/v1/integrations/mongodb/sync/${configId}`, {
+            method: 'POST',
+            headers: {
+                ...getAuthHeader(),
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || 'Sync failed');
+        }
+        return response.json();
+    },
+
+    async removeMongoDB(id: string) {
+        const response = await fetch(`/api/v1/integrations/mongodb/${id}`, {
+            method: 'DELETE',
+            headers: {
+                ...getAuthHeader(),
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) throw new Error('Failed to remove MongoDB integration');
+        return response.json();
     }
 };

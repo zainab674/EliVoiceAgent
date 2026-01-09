@@ -6,6 +6,7 @@ import CsvContact from '../models/CsvContact.js';
 import { protect as requireAuth } from '../middleware/auth.js';
 import multer from 'multer';
 import fs from 'fs';
+import path from 'path';
 import emailService from '../services/email-service.js';
 import Assistant from '../models/Assistant.js';
 
@@ -57,7 +58,10 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // POST /api/v1/email-campaigns
-router.post('/', requireAuth, upload.single('attachment'), async (req, res) => {
+router.post('/', requireAuth, upload.fields([
+    { name: 'attachment', maxCount: 1 },
+    { name: 'image', maxCount: 1 }
+]), async (req, res) => {
     try {
         const {
             name,
@@ -67,10 +71,12 @@ router.post('/', requireAuth, upload.single('attachment'), async (req, res) => {
             contactListId,
             csvFileId,
             subject,
-            body
+            body,
+            link
         } = req.body;
 
-        const attachment = req.file;
+        const attachment = req.files?.attachment?.[0];
+        const image = req.files?.image?.[0];
 
         if (!name || !assistantId || !emailIntegrationId || !contactSource || !subject || !body) {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -116,8 +122,11 @@ router.post('/', requireAuth, upload.single('attachment'), async (req, res) => {
             csvFileId: csvFileId || undefined,
             subject,
             body,
+            link,
             attachmentPath: attachment ? attachment.path : undefined,
             attachmentOriginalName: attachment ? attachment.originalname : undefined,
+            imagePath: image ? image.path : undefined,
+            imageOriginalName: image ? image.originalname : undefined,
             status: 'draft',
             totalRecipients: recipients.length
         });
@@ -191,15 +200,55 @@ router.post('/:id/start', requireAuth, async (req, res) => {
             email: integration.email
         };
 
+        // Prepare content with link replacement or appendix
+        let textContent = campaign.body;
+        let htmlContent = campaign.body.replace(/\n/g, '<br>');
+
+        if (campaign.link) {
+            const linkDisplay = campaign.link;
+            const linkHtml = `<a href="${campaign.link}" style="color: #4f46e5; text-decoration: underline; font-weight: bold;">${campaign.link}</a>`;
+
+            if (textContent.includes('{{link}}')) {
+                textContent = textContent.replace(/\{\{link\}\}/g, linkDisplay);
+                htmlContent = htmlContent.replace(/\{\{link\}\}/g, linkHtml);
+            } else {
+                // Appendix if no placeholder
+                textContent += `\n\n${linkDisplay}`;
+                htmlContent += `<br><br>${linkHtml}`;
+            }
+        } else {
+            // Clean up placeholders if no link provided
+            textContent = textContent.replace(/\{\{link\}\}/g, '');
+            htmlContent = htmlContent.replace(/\{\{link\}\}/g, '');
+        }
+
+        // Add image to HTML if exists
+        if (campaign.imagePath) {
+            const imageHtml = `<br><br><img src="cid:campaignimage" style="max-width: 100%; height: auto; border-radius: 8px;" />`;
+            // If there's a link, maybe wrap the image in it too? 
+            if (campaign.link) {
+                htmlContent += `<br><br><a href="${campaign.link}">${imageHtml}</a>`;
+            } else {
+                htmlContent += imageHtml;
+            }
+        }
+
         const emailOptionsBase = {
             from: integration.email,
             subject: campaign.subject,
-            text: campaign.body,
-            html: `<div style="font-family: Arial, sans-serif; line-height: 1.6;">${campaign.body.replace(/\n/g, '<br>')}</div>`,
-            attachments: campaign.attachmentPath ? [{
-                filename: campaign.attachmentOriginalName,
-                path: campaign.attachmentPath
-            }] : []
+            text: textContent,
+            html: `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #374151;">${htmlContent}</div>`,
+            attachments: [
+                ...(campaign.attachmentPath ? [{
+                    filename: campaign.attachmentOriginalName,
+                    path: path.resolve(campaign.attachmentPath)
+                }] : []),
+                ...(campaign.imagePath ? [{
+                    filename: campaign.imageOriginalName,
+                    path: path.resolve(campaign.imagePath),
+                    cid: 'campaignimage'
+                }] : [])
+            ]
         };
 
         res.json({ success: true, message: 'Campaign started' });
@@ -212,6 +261,13 @@ router.post('/:id/start', requireAuth, async (req, res) => {
             console.log(`[EmailCampaign] Starting campaign ${campaign._id} for ${recipients.length} recipients`);
 
             for (const recipientEmail of recipients) {
+                // Check if campaign was paused
+                const currentCampaign = await EmailCampaign.findById(campaign._id);
+                if (!currentCampaign || currentCampaign.status === 'paused') {
+                    console.log(`[EmailCampaign] Campaign ${campaign._id} was paused or deleted. Stopping loop.`);
+                    return;
+                }
+
                 try {
                     await emailService.sendEmail(
                         emailSettings,
@@ -223,30 +279,59 @@ router.post('/:id/start', requireAuth, async (req, res) => {
                         }
                     );
                     sentCount++;
-                    // Ideally update DB periodically here
+
+                    // Periodically update progress in DB
+                    if (sentCount % 5 === 0) {
+                        currentCampaign.stats.sent = sentCount;
+                        currentCampaign.stats.failed = failedCount;
+                        await currentCampaign.save();
+                    }
                 } catch (err) {
                     console.error(`[EmailCampaign] Failed to send to ${recipientEmail}:`, err.message);
                     failedCount++;
                 }
             }
 
-            // Update Campaign stats
-            campaign.stats.sent = sentCount;
-            campaign.stats.failed = failedCount;
-            campaign.status = 'completed';
-            await campaign.save();
-
-            console.log(`[EmailCampaign] Campaign ${campaign._id} finished. Sent: ${sentCount}, Failed: ${failedCount}`);
+            // Update Final stats
+            const finalCampaign = await EmailCampaign.findById(campaign._id);
+            if (finalCampaign && finalCampaign.status !== 'paused') {
+                finalCampaign.stats.sent = sentCount;
+                finalCampaign.stats.failed = failedCount;
+                finalCampaign.status = 'completed';
+                await finalCampaign.save();
+                console.log(`[EmailCampaign] Campaign ${campaign._id} finished. Sent: ${sentCount}, Failed: ${failedCount}`);
+            }
 
         })().catch(err => {
             console.error('[EmailCampaign] Background process error:', err);
-            campaign.status = 'failed';
-            campaign.save();
+            EmailCampaign.findByIdAndUpdate(campaign._id, { status: 'failed' }).catch(() => { });
         });
 
     } catch (error) {
         console.error('[EmailCampaign] Start Error:', error);
         res.status(500).json({ success: false, message: 'Failed to start campaign' });
+    }
+});
+
+// POST /api/v1/email-campaigns/:id/pause
+router.post('/:id/pause', requireAuth, async (req, res) => {
+    try {
+        const campaign = await EmailCampaign.findOne({ _id: req.params.id, userId: req.user.id });
+        if (!campaign) {
+            return res.status(404).json({ success: false, message: 'Campaign not found' });
+        }
+
+        if (campaign.status !== 'sending') {
+            return res.status(400).json({ success: false, message: 'Only sending campaigns can be paused' });
+        }
+
+        campaign.status = 'paused';
+        await campaign.save();
+
+        res.json({ success: true, message: 'Campaign paused' });
+    } catch (error) {
+        console.error('[EmailCampaign] Pause Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to pause campaign' });
     }
 });
 

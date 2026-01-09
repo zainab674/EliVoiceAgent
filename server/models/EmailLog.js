@@ -32,11 +32,18 @@ const emailLogSchema = new mongoose.Schema({
     inReplyTo: String, // Parent message ID
     hasAttachments: Boolean,
     messageId: String, // SMTP Message-ID
+    imapUid: Number, // IMAP UID for fast syncing
+    mailbox: String, // Box name (INBOX, Sent, etc.)
     error: String,
     createdAt: {
         type: Date,
         default: Date.now
     }
 });
+
+emailLogSchema.index({ userId: 1, createdAt: -1 });
+emailLogSchema.index({ userId: 1, imapUid: 1, mailbox: 1 });
+emailLogSchema.index({ messageId: 1 });
+emailLogSchema.index({ threadId: 1 });
 
 export default mongoose.model('EmailLog', emailLogSchema);

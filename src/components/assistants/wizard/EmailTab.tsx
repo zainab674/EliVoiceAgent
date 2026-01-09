@@ -14,6 +14,8 @@ interface EmailTabProps {
         subject: string;
         body: string;
         fromEmail: string;
+        emailReplyPrompt?: string;
+        link?: string;
     };
     assistantName: string;
     documents: any[];
@@ -114,6 +116,17 @@ export function EmailTab({ data, assistantName, documents, onChange }: EmailTabP
                             placeholder="e.g. Information from our call"
                         />
                     </div>
+                    <div className="space-y-2">
+                        <Label>Tracking / Booking Link (Optional)</Label>
+                        <Input
+                            value={data.link || ""}
+                            onChange={(e) => onChange({ ...data, link: e.target.value })}
+                            placeholder="https://example.com/booking"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Use {"{{link}}"} in the body to insert this link.
+                        </p>
+                    </div>
 
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -138,6 +151,26 @@ export function EmailTab({ data, assistantName, documents, onChange }: EmailTabP
                         <p className="text-xs text-muted-foreground">
                             Tip: The assistant will automatically replace [Name] with the caller's name if collected.
                         </p>
+                    </div>
+                </div>
+            </Card>
+
+            <Card className="p-6 bg-card/50 backdrop-blur-sm border-white/10">
+                <h3 className="text-lg font-semibold mb-4">AI Reply Automation</h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                    Configure how the AI assistant should respond when a lead replies to an email.
+                    If left blank, the assistant will use its main System Prompt.
+                </p>
+
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>AI Email Reply Prompt</Label>
+                        <Textarea
+                            value={data.emailReplyPrompt || ""}
+                            onChange={(e) => onChange({ ...data, emailReplyPrompt: e.target.value })}
+                            placeholder="e.g. You are an expert sales closer. Your goal is to get the lead to book a call using the provided link..."
+                            className="min-h-[150px]"
+                        />
                     </div>
                 </div>
             </Card>

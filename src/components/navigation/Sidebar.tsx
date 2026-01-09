@@ -18,7 +18,8 @@ import {
     Blocks,
     Calendar,
     Mail,
-    Send
+    Send,
+    Database
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/SupportAccessAuthContext";
@@ -42,6 +43,7 @@ export default function Sidebar() {
         { icon: <Mail size={20} />, label: "Emails", to: "/emails" },
         { icon: <Send size={20} />, label: "Email Campaign", to: "/email-automation" },
         { icon: <MessageSquare size={20} />, label: "SMS Campaign", to: "/sms-campaign" },
+        { icon: <Database size={20} />, label: "Submissions", to: "/submissions" },
         { icon: <Blocks size={20} />, label: "Integrations", to: "/settings?tab=integrations" },
     ];
 

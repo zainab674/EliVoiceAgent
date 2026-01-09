@@ -8,6 +8,7 @@ export interface ModelData {
   maxTokens: number;
   firstMessage: string;
   systemPrompt: string;
+  emailReplyPrompt: string;
   language: string;
   transcriber: {
     model: string;
@@ -167,7 +168,10 @@ export interface AssistantFormData {
   emailTemplate: {
     subject: string;
     body: string;
+    sender?: string;
     fromEmail: string; // The selected connected email
+    emailReplyPrompt: string;
+    link?: string;
   };
   analysis: AnalysisData;
   advanced: AdvancedData;

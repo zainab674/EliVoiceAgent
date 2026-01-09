@@ -16,6 +16,8 @@ import { CalendarCredentialsService, type UserCalendarCredentials, type Calendar
 
 import { EmailAuthDialog } from "./EmailAuthDialog";
 import { EmailIntegrationCard } from "./EmailIntegrationCard";
+import { MongoDBAuthDialog } from "./MongoDBAuthDialog";
+import { MongoDBIntegrationCard } from "./MongoDBIntegrationCard";
 import { IntegrationService, type EmailIntegration } from "@/lib/api/integrations";
 
 const integrations = [
@@ -72,6 +74,15 @@ const integrations = [
     status: "available",
     category: "Communication",
     brandColor: "#EA4335" // Gmail red-ish
+  },
+  {
+    id: "mongodb",
+    name: "MongoDB",
+    description: "Connect to external MongoDB for lead sync (QB Express)",
+    icon: Database,
+    status: "available",
+    category: "Data",
+    brandColor: "#47A248" // MongoDB Green
   }
 ];
 
@@ -82,6 +93,7 @@ export function ApiIntegrations() {
   const [calendarIntegrations, setCalendarIntegrations] = useState<UserCalendarCredentials[]>([]);
 
   const [emailIntegrations, setEmailIntegrations] = useState<EmailIntegration[]>([]);
+  const [mongodbIntegrations, setMongodbIntegrations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIntegration, setSelectedIntegration] = useState<typeof integrations[0] | null>(null);
 
@@ -90,7 +102,17 @@ export function ApiIntegrations() {
     loadTwilioCredentials();
     loadCalendarCredentials();
     loadEmailCredentials();
+    loadMongoDBIntegrations();
   }, []);
+
+  const loadMongoDBIntegrations = async () => {
+    try {
+      const data = await IntegrationService.getIntegrations();
+      setMongodbIntegrations(data.mongodb || []);
+    } catch (error) {
+      console.error("Error loading MongoDB integrations:", error);
+    }
+  };
 
   const loadEmailCredentials = async () => {
     try {
@@ -193,6 +215,60 @@ export function ApiIntegrations() {
     }
   };
 
+  const handleRemoveMongoDB = async (id: string) => {
+    try {
+      await IntegrationService.removeMongoDB(id);
+      await loadMongoDBIntegrations();
+      toast({
+        title: "Integration Removed",
+        description: "MongoDB integration removed successfully."
+      });
+    } catch (error) {
+      console.error("Error removing MongoDB:", error);
+      toast({
+        title: "Removal Failed",
+        description: "Failed to remove MongoDB integration.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleMongoDBConnect = async (data: any) => {
+    try {
+      await IntegrationService.connectMongoDB(data);
+      await loadMongoDBIntegrations();
+      toast({
+        title: "MongoDB Connected",
+        description: "Your MongoDB collection has been connected successfully."
+      });
+    } catch (error) {
+      console.error("Error connecting MongoDB:", error);
+      toast({
+        title: "Connection Failed",
+        description: error instanceof Error ? error.message : "Failed to connect MongoDB",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleMongoDBSync = async (id: string) => {
+    try {
+      await IntegrationService.triggerMongoDBSync(id);
+      await loadMongoDBIntegrations();
+      toast({
+        title: "Sync Completed",
+        description: "Leads have been synchronized successfully."
+      });
+    } catch (error) {
+      console.error("Error syncing MongoDB:", error);
+      toast({
+        title: "Sync Failed",
+        description: error instanceof Error ? error.message : "Failed to sync leads",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleRemoveEmailIntegration = async (email: string) => {
     try {
       await IntegrationService.removeEmail(email);
@@ -230,6 +306,12 @@ export function ApiIntegrations() {
       return {
         ...integration,
         status: emailIntegrations.length > 0 ? "connected" : "available"
+      };
+    }
+    if (integration.id === "mongodb") {
+      return {
+        ...integration,
+        status: mongodbIntegrations.length > 0 ? "connected" : "available"
       };
     }
     return integration;
@@ -387,7 +469,7 @@ export function ApiIntegrations() {
   };
 
   const handleIntegrationClick = (integration: typeof integrations[0]) => {
-    if (["twilio", "calcom", "google_calendar", "outlook_calendar", "calendly", "email"].includes(integration.id)) {
+    if (["twilio", "calcom", "google_calendar", "outlook_calendar", "calendly", "email", "mongodb"].includes(integration.id)) {
       setSelectedIntegration(integration);
       return;
     }
@@ -510,6 +592,26 @@ export function ApiIntegrations() {
                   )}
                 </Button>
               </EmailAuthDialog>
+            ) : integration.id === "mongodb" ? (
+              <MongoDBAuthDialog onSuccess={handleMongoDBConnect}>
+                <Button
+                  variant={isConnected ? "outline" : "default"}
+                  className="w-full text-sm h-8 relative z-10 flex items-center justify-center gap-1.5"
+                  size="sm"
+                >
+                  {isConnected ? (
+                    <>
+                      <CheckCircle2 className="w-3 h-3" />
+                      Manage
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3 h-3" />
+                      Connect
+                    </>
+                  )}
+                </Button>
+              </MongoDBAuthDialog>
             ) : (
               <Button
                 variant={isConnected ? "outline" : "default"}
@@ -558,6 +660,9 @@ export function ApiIntegrations() {
           </TabsTrigger>
           <TabsTrigger value="calendar" className="text-sm font-medium data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
             Calendar ({getCategoryCount("calendar")})
+          </TabsTrigger>
+          <TabsTrigger value="data" className="text-sm font-medium data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+            Data ({getCategoryCount("data")})
           </TabsTrigger>
         </TabsList>
 
@@ -682,6 +787,36 @@ export function ApiIntegrations() {
                       <EmailAuthDialog onSuccess={handleEmailConnect}>
                         <Button variant="outline">Connect Now</Button>
                       </EmailAuthDialog>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {selectedIntegration.id === "mongodb" && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-medium">MongoDB Configurations</h3>
+                    <MongoDBAuthDialog onSuccess={handleMongoDBConnect}>
+                      <Button size="sm">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Config
+                      </Button>
+                    </MongoDBAuthDialog>
+                  </div>
+
+                  {mongodbIntegrations.length > 0 ? (
+                    <MongoDBIntegrationCard
+                      integrations={mongodbIntegrations}
+                      onSuccess={handleMongoDBConnect}
+                      onRemove={handleRemoveMongoDB}
+                      onSync={handleMongoDBSync}
+                    />
+                  ) : (
+                    <div className="text-center py-8 bg-secondary/20 rounded-lg border border-dashed">
+                      <p className="text-muted-foreground mb-4">No MongoDB connections yet.</p>
+                      <MongoDBAuthDialog onSuccess={handleMongoDBConnect}>
+                        <Button variant="outline">Connect Now</Button>
+                      </MongoDBAuthDialog>
                     </div>
                   )}
                 </>

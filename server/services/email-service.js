@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import EmailLog from '../models/EmailLog.js';
+import Appointment from '../models/Appointment.js';
 import Assistant from '../models/Assistant.js';
 import OpenAI from 'openai';
 
@@ -21,19 +22,62 @@ class EmailService {
             throw new Error('Missing SMTP credentials');
         }
 
-        const transporter = nodemailer.createTransport({
+        console.log('[EmailService] Preparing to send email...');
+        console.log('[EmailService] SMTP Config:', {
             host: smtpHost,
             port: smtpPort || 587,
-            secure: smtpPort === 465, // true for 465, false for other ports
+            secure: smtpPort === 465,
+            user: smtpUser,
+            passLength: smtpPass?.length
+        });
+        console.log('[EmailService] Email Details:', {
+            from: emailOptions.from,
+            to: emailOptions.to,
+            subject: emailOptions.subject,
+            hasHeaders: !!emailOptions.headers,
+            headers: emailOptions.headers
+        });
+
+        const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: parseInt(smtpPort) || 587,
+            secure: parseInt(smtpPort) === 465, // true for 465, false for other ports
             auth: {
                 user: smtpUser,
                 pass: smtpPass,
             },
+            tls: {
+                rejectUnauthorized: false
+            },
+            connectionTimeout: 40000, // 40 seconds
+            greetingTimeout: 40000,
+            socketTimeout: 60000,
+            debug: true, // Enable debug output
+            logger: true // Log to console
         });
 
         try {
+            console.log('[EmailService] Sending email now...');
             const info = await transporter.sendMail(emailOptions);
-            console.log('Email sent: %s', info.messageId);
+            console.log('---------------------------------------------------');
+            console.log('[EmailService] ✅ Email sent successfully!');
+            console.log('[EmailService] Message ID: %s', info.messageId);
+            console.log('[EmailService] SMTP Response:', info.response);
+            console.log('[EmailService] Accepted Recipients:', info.accepted);
+            console.log('[EmailService] Rejected Recipients:', info.rejected);
+            console.log('[EmailService] Pending Recipients:', info.pending);
+            console.log('[EmailService] Envelope:', JSON.stringify(info.envelope, null, 2));
+
+            // Check if email was actually accepted
+            if (info.rejected && info.rejected.length > 0) {
+                console.error('[EmailService] ⚠️ WARNING: Some recipients were REJECTED:', info.rejected);
+            }
+            if (!info.accepted || info.accepted.length === 0) {
+                console.error('[EmailService] ❌ ERROR: No recipients accepted the email!');
+                throw new Error('Email was not accepted by any recipients');
+            }
+
+            console.log('---------------------------------------------------');
 
             // Attempt to append to Sent folder via IMAP (best effort)
             if (userSettings.imapHost && userSettings.imapUser && userSettings.imapPass) {
@@ -68,7 +112,12 @@ class EmailService {
 
             return info;
         } catch (error) {
-            console.error('Error sending email:', error);
+            console.error('---------------------------------------------------');
+            console.error('[EmailService] ❌ Error sending email:', error.message);
+            console.error('[EmailService] Error code:', error.code);
+            console.error('[EmailService] Error command:', error.command);
+            console.error('[EmailService] Full error:', error);
+            console.error('---------------------------------------------------');
 
             // Log failure
             if (context.userId) {
@@ -181,7 +230,8 @@ class EmailService {
             const parentLog = await EmailLog.findOne({
                 messageId: { $in: references },
                 userId: user._id,
-                direction: 'outbound' // We are looking for a reply to our outbound email
+                direction: 'outbound', // We are looking for a reply to our outbound email
+                from: integration.email || integration.smtpUser
             });
 
             if (!parentLog) {
@@ -226,33 +276,83 @@ class EmailService {
         try {
             console.log(`[EmailMonitor] Generating AI reply for Assistant: ${assistant.name}`);
 
+            // Validate OpenAI API Key
+            if (!process.env.OPENAI_API_KEY) {
+                console.error('[EmailMonitor] OPENAI_API_KEY is not set in environment variables. Cannot generate AI reply.');
+                return;
+            }
+
+            // Validate SMTP credentials
+            if (!integration.smtpHost || !integration.smtpUser || !integration.smtpPass) {
+                console.error('[EmailMonitor] Missing SMTP credentials in integration. Cannot send reply.');
+                console.error(`[EmailMonitor] smtpHost: ${integration.smtpHost ? 'SET' : 'MISSING'}`);
+                console.error(`[EmailMonitor] smtpUser: ${integration.smtpUser ? 'SET' : 'MISSING'}`);
+                console.error(`[EmailMonitor] smtpPass: ${integration.smtpPass ? 'SET' : 'MISSING'}`);
+                return;
+            }
+
             // Fetch thread history
             const history = await EmailLog.find({ threadId: inboundLog.threadId })
                 .sort({ createdAt: 1 })
                 .limit(10); // Last 10 messages for context
 
             // Construct Prompt
-            let prompt = `You are an AI assistant named ${assistant.name}.\n`;
-            prompt += `Your instructions: ${assistant.systemPrompt || 'Be helpful and professional.'}\n\n`;
-            prompt += `Conversation History:\n`;
+            let historyText = '';
+            const logs = await EmailLog.find({ threadId: inboundLog.threadId }).sort({ createdAt: 1 });
 
-            history.forEach(msg => {
+            logs.forEach(msg => {
                 const role = msg.direction === 'outbound' ? 'You (Assistant)' : 'User';
-                // Clean up body (simple truncation or cleanup)
                 const snippet = msg.body ? msg.body.substring(0, 500) : '[No Content]';
-                prompt += `${role}: ${snippet}\n\n`;
+                historyText += `${role}: ${snippet}\n\n`;
             });
 
-            prompt += `User just replied: "${incomingEmail.text || ''}"\n`;
-            prompt += `\nPlease write a reply to the user. Keep it concise and professional. Do not include subject line in the body.`;
+            const messageText = incomingEmail.text || '';
+            let recipientName = 'User';
+            let recipientEmail = '';
 
-            // Call OpenAI
+            if (incomingEmail.from && typeof incomingEmail.from === 'object') {
+                recipientName = incomingEmail.from.name || 'User';
+                recipientEmail = incomingEmail.from.text;
+            } else if (typeof incomingEmail.from === 'string') {
+                const match = incomingEmail.from.match(/(.*)<([^>]+)>/);
+                if (match) {
+                    recipientName = match[1].trim() || 'User';
+                    recipientEmail = match[2].trim();
+                } else {
+                    recipientEmail = incomingEmail.from.trim();
+                }
+            }
+
+            const threadInfo = {
+                recipientName,
+                recipientEmail
+            };
+
+            const systemPrompt = assistant.emailReplyPrompt || "You are a professional and helpful email assistant.";
+
+            console.log(`[EmailMonitor] Using prompt: ${systemPrompt.substring(0, 100)}...`);
+            console.log(`[EmailMonitor] Thread history length: ${logs.length} messages`);
+            console.log(`[EmailMonitor] Incoming message from: ${threadInfo.recipientEmail}`);
+
+            console.log(`[EmailMonitor] Calling OpenAI API...`);
             const completion = await openai.chat.completions.create({
-                messages: [{ role: "user", content: prompt }],
                 model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Conversation history:\n${historyText}\n\nLatest message from ${threadInfo.recipientName || threadInfo.recipientEmail}: "${messageText}"\n\nGenerate a concise and professional reply.` }
+                ]
             });
 
-            const replyText = completion.choices[0].message.content.trim();
+            const responseMessage = completion.choices[0].message;
+            let replyText = responseMessage.content || '';
+
+            console.log(`[EmailMonitor] AI generated reply (${replyText.length} chars)`);
+
+
+            if (!replyText || replyText.trim() === '') {
+                console.error('[EmailMonitor] AI generated empty reply. Aborting send.');
+                return;
+            }
 
             // Send Reply
             const recipient = incomingEmail.from && typeof incomingEmail.from === 'object' && incomingEmail.from.text
@@ -262,7 +362,9 @@ class EmailService {
             const emailOptions = {
                 from: integration.email,
                 to: recipient, // Reply to sender
-                subject: incomingEmail.subject.startsWith('Re:') ? incomingEmail.subject : `Re: ${incomingEmail.subject}`,
+                subject: incomingEmail.subject.replace(/\*\*\*SPAM\*\*\*\s*/gi, '').startsWith('Re:')
+                    ? incomingEmail.subject.replace(/\*\*\*SPAM\*\*\*\s*/gi, '')
+                    : `Re: ${incomingEmail.subject.replace(/\*\*\*SPAM\*\*\*\s*/gi, '')}`,
                 text: replyText,
                 html: `<div style="font-family: Arial, sans-serif; pre-wrap: break-word;">${replyText.replace(/\n/g, '<br>')}</div>`,
                 headers: {
@@ -271,12 +373,18 @@ class EmailService {
                 }
             };
 
+            console.log(`[EmailMonitor] Sending reply to: ${recipient}`);
+            console.log(`[EmailMonitor] Subject: ${emailOptions.subject}`);
+
             await this.sendEmail(
                 {
                     smtpHost: integration.smtpHost,
                     smtpPort: integration.smtpPort,
                     smtpUser: integration.smtpUser,
-                    smtpPass: integration.smtpPass
+                    smtpPass: integration.smtpPass,
+                    imapHost: integration.imapHost,
+                    imapUser: integration.imapUser || integration.smtpUser,
+                    imapPass: integration.imapPass || integration.smtpPass
                 },
                 emailOptions,
                 {
@@ -286,28 +394,33 @@ class EmailService {
                 }
             );
 
-            console.log(`[EmailMonitor] Auto-reply sent to ${incomingEmail.from.text}`);
+            console.log(`[EmailMonitor] Auto-reply sent successfully to ${recipient}`);
 
         } catch (error) {
             console.error('[EmailMonitor] Failed to generate/send reply:', error);
+            console.error('[EmailMonitor] Error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
         }
     }
 
     /**
-     * Check for new emails using IMAP
-     * @param {Object} userSettings - containing email, smtpPass (used as imap pass), imapHost, imapPort
+     * @param {Object} userSettings - containing email, smtpPass (used as imap pass), imapHost, imapPort, userId
      * @returns {Promise<Array>} List of new email objects
      */
-    async checkEmails(userSettings) {
-        const { email, smtpPass, imapHost, imapPort } = userSettings;
+    async checkEmails(userSettings, criteria = null) {
+        const { email, imapUser, smtpPass, imapHost, imapPort, userId } = userSettings;
         const imap = (await import('imap-simple'));
         const { simpleParser } = (await import('mailparser'));
+        const EmailLog = (await import('../models/EmailLog.js')).default;
 
         process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
         const config = {
             imap: {
-                user: email,
+                user: imapUser || email,
                 password: smtpPass,
                 host: imapHost || 'imap.gmail.com',
                 port: imapPort || 993,
@@ -322,42 +435,116 @@ class EmailService {
         try {
             const connection = await imap.connect(config);
 
+            connection.on('error', (err) => {
+                console.error('[EmailService] IMAP connection emitted error:', err.message);
+            });
+
             // Helper to fetch and parse from a box
             const fetchFromBox = async (boxName, folderType) => {
                 try {
                     await connection.openBox(boxName);
 
-                    const lookback = new Date();
-                    lookback.setDate(lookback.getDate() - 7);
-                    const searchCriteria = [['SINCE', lookback]];
-                    const fetchOptions = {
-                        bodies: ['HEADER', 'TEXT', ''],
-                        markSeen: false // Don't mark sent items as seen/read (or do?) - usually safe to leave as is
-                    };
-                    // For INBOX we might want to mark seen, for SENT maybe not?
-                    // Previous logic marked seen. Let's keep it consistency: existing logic was markSeen: true.
-                    if (folderType === 'inbox') fetchOptions.markSeen = true;
+                    let searchCriteria = criteria;
+                    if (!searchCriteria) {
+                        const lookback = new Date();
+                        lookback.setDate(lookback.getDate() - 3); // Default to 3 days for efficiency
+                        searchCriteria = [['SINCE', lookback]];
+                    }
 
-                    const messages = await connection.search(searchCriteria, fetchOptions);
-                    console.log(`[EmailService] Found ${messages.length} emails in ${boxName} (${folderType})`);
+                    // 1. FAST STAGE: Fetch only headers/attributes to check for existence
+                    const headerFetchOptions = {
+                        bodies: ['HEADER.FIELDS (MESSAGE-ID)'],
+                        markSeen: false
+                    };
+
+                    const stubs = await connection.search(searchCriteria, headerFetchOptions);
+                    if (stubs.length === 0) return;
+
+                    console.log(`[EmailService] Found ${stubs.length} candidates in ${boxName}. Checking for new ones...`);
+
+                    // Get message IDs for filtering
+                    const stubMap = new Map();
+                    stubs.forEach(s => {
+                        const headerPart = s.parts.find(p => p.which.includes('HEADER'));
+                        const messageId = headerPart?.body?.['message-id']?.[0] || null;
+                        if (messageId) {
+                            stubMap.set(messageId, s.attributes.uid);
+                        } else {
+                            // Fallback if no message-id in header (rare)
+                            stubMap.set(`uid-${s.attributes.uid}`, s.attributes.uid);
+                        }
+                    });
+
+                    // Check which Message-IDs we already have in our logs
+                    const existingLogs = await EmailLog.find({
+                        userId: userId,
+                        messageId: { $in: Array.from(stubMap.keys()) }
+                    }).select('messageId imapUid');
+
+                    const existingMsgIds = new Set(existingLogs.map(l => l.messageId));
+
+                    // Identify UIDs that are truly new
+                    const newUids = [];
+                    for (const [msgId, uid] of stubMap.entries()) {
+                        if (!existingMsgIds.has(msgId)) {
+                            newUids.push(uid);
+                        }
+                    }
+
+                    if (newUids.length === 0) {
+                        console.log(`[EmailService] No new messages in ${boxName}`);
+                        return;
+                    }
+
+                    // 2. BODY STAGE: Fetch full content only for new UIDs
+                    // Limit to 50 per sync to avoid timeouts and heavy loads
+                    const uidsToFetch = newUids.slice(0, 50);
+                    console.log(`[EmailService] Syncing ${uidsToFetch.length} new messages from ${boxName}`);
+
+                    const fetchOptions = {
+                        bodies: [''],
+                        markSeen: false
+                    };
+
+                    if (folderType === 'inbox' && (criteria && criteria.includes('UNSEEN'))) {
+                        fetchOptions.markSeen = true;
+                    }
+
+                    // Use the raw imap connection to fetch by UIDs specifically
+                    const messages = await connection.search([['UID', uidsToFetch.join(',')]], fetchOptions);
 
                     for (const item of messages) {
                         const all = item.parts.find(part => part.which === '');
+                        if (!all) continue;
+
                         const id = item.attributes.uid;
-                        const idHeader = "Imap-Id: " + id + "\r\n";
-                        const parsed = await simpleParser(idHeader + all.body);
+                        let parsed;
+                        try {
+                            parsed = await simpleParser(all.body);
+                        } catch (err) {
+                            console.error(`[EmailService] ❌ Error parsing UID ${id}:`, err.message);
+                            continue;
+                        }
+
+                        if (!parsed.messageId) {
+                            parsed.messageId = `<imap-uid-${id}@${email.split('@')[1] || 'local'}>`;
+                        }
+
+                        const cleanValue = (val) => (val === 'undefined' || val === 'null' || !val) ? null : val;
 
                         collectedEmails.push({
-                            folder: folderType, // 'inbox' or 'sent'
-                            from: parsed.from?.text,
-                            to: parsed.to?.text,
-                            subject: parsed.subject,
+                            folder: folderType,
+                            mailbox: boxName,
+                            from: cleanValue(parsed.from?.text) || 'unknown@example.com',
+                            to: cleanValue(parsed.to?.text) || email,
+                            subject: cleanValue(parsed.subject) || '(No Subject)',
                             text: parsed.text,
                             html: parsed.html,
                             messageId: parsed.messageId,
                             inReplyTo: parsed.inReplyTo,
                             references: parsed.references,
-                            date: parsed.date
+                            date: parsed.date || new Date(),
+                            imapUid: id
                         });
                     }
                 } catch (err) {
@@ -365,16 +552,13 @@ class EmailService {
                 }
             };
 
-            // 1. Fetch INBOX
             await fetchFromBox('INBOX', 'inbox');
 
-            // 2. Fetch SENT
             const sentBox = await this._detectSentBox(connection);
-            if (sentBox) {
-                await fetchFromBox(sentBox, 'sent');
-            } else {
-                console.warn('[EmailService] Could not detect Sent folder for syncing');
-            }
+            if (sentBox) await fetchFromBox(sentBox, 'sent');
+
+            const junkBox = await this._detectJunkBox(connection);
+            if (junkBox) await fetchFromBox(junkBox, 'junk');
 
             connection.end();
             return collectedEmails;
@@ -420,6 +604,43 @@ class EmailService {
             if (match) sentBoxName = match;
         }
         return sentBoxName;
+    }
+
+    // Helper to detect junk/spam box
+    async _detectJunkBox(connection) {
+        const boxes = await connection.getBoxes();
+        const candidates = ['Junk', 'Spam', 'Junk E-mail', 'Bulk Mail', 'Spam Messages', 'INBOX.Spam', 'INBOX.Junk'];
+
+        const findJunkBox = (boxList, prefix = '') => {
+            for (const key of Object.keys(boxList)) {
+                const box = boxList[key];
+                const fullPath = prefix + key;
+                if (box.attribs && box.attribs.some(a => typeof a === 'string' && (a.toUpperCase() === '\\JUNK' || a.toUpperCase() === '\\SPAM'))) {
+                    return fullPath;
+                }
+                if (box.children) {
+                    const childFound = findJunkBox(box.children, fullPath + box.delimiter);
+                    if (childFound) return childFound;
+                }
+            }
+            return null;
+        };
+
+        let junkBoxName = findJunkBox(boxes);
+        if (!junkBoxName) {
+            const allPaths = [];
+            const flatten = (boxList, prefix = '') => {
+                for (const key of Object.keys(boxList)) {
+                    const delim = boxList[key].delimiter || '.';
+                    allPaths.push(prefix + key);
+                    if (boxList[key].children) flatten(boxList[key].children, prefix + key + delim);
+                }
+            };
+            flatten(boxes);
+            const match = allPaths.find(p => candidates.some(c => p.endsWith(c) || p === c));
+            if (match) junkBoxName = match;
+        }
+        return junkBoxName;
     }
     /**
      * Append a sent message to the Sent folder via IMAP

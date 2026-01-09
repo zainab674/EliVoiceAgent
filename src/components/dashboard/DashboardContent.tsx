@@ -13,13 +13,16 @@ import {
   PhoneCall,
   Briefcase,
   Megaphone,
-  Mail
+  Mail,
+  Database,
+  Monitor
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { fetchContacts } from "@/lib/api/contacts/fetchContacts";
 import { fetchContactLists } from "@/lib/api/contacts/fetchContactLists";
 import { fetchCampaigns } from "@/lib/api/campaigns";
 import { useAuth } from "@/contexts/SupportAccessAuthContext";
+import { ActivityDetailDialog } from "./ActivityDetailDialog";
 
 interface DashboardContentProps {
   dateRange: {
@@ -31,6 +34,9 @@ interface DashboardContentProps {
   emailStats: {
     totalThreads: number;
     totalMessages: number;
+    totalSent: number;
+    totalReplies: number;
+    replyRate: number;
   };
   isLoading: boolean;
   stats: {
@@ -39,6 +45,7 @@ interface DashboardContentProps {
     appointments: number;
     bookingRate: number;
     successfulTransfers: number;
+    formSubmissions: number;
   };
   callOutcomesData: Record<string, number>;
 }
@@ -60,6 +67,8 @@ export default function DashboardContent({
   const [phoneNumbers, setPhoneNumbers] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [selectedActivity, setSelectedActivity] = useState<any | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // Load additional data
   useEffect(() => {
@@ -218,37 +227,41 @@ export default function DashboardContent({
                   <p className="text-xs text-muted-foreground">Avg Duration</p>
                 </div>
                 <div className="p-3 rounded-lg bg-secondary/20 border border-border text-center">
-                  <p className="text-2xl font-bold">{emailStats?.totalThreads || 0}</p>
-                  <p className="text-xs text-muted-foreground">Active Email Threads</p>
-                </div>
-                <div className="p-3 rounded-lg bg-secondary/20 border border-border text-center">
                   <p className="text-2xl font-bold text-success">{stats.appointments}</p>
-                  <p className="text-xs text-muted-foreground">Appointments</p>
+                  <p className="text-xs text-muted-foreground">Bookings</p>
+                </div>
+                <div className="p-3 rounded-lg bg-secondary/20 border border-border text-center font-bold">
+                  <p className="text-2xl text-blue-500">{stats.formSubmissions}</p>
+                  <p className="text-xs text-muted-foreground">Form Fills</p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/20 border border-border mt-4">
-                <div className="flex items-center gap-3">
-                  <Megaphone className="h-5 w-5 text-warning" />
-                  <div>
-                    <p className="font-medium text-foreground">Active Campaigns</p>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/20 border border-border">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-5 w-5 text-blue-500" />
+                    <div>
+                      <p className="font-medium text-foreground">Email Outreach</p>
+                      <p className="text-[10px] text-muted-foreground">{emailStats.totalSent} sent • {emailStats.replyRate}% reply rate</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-lg">{emailStats.totalReplies}</p>
+                    <p className="text-[10px] text-muted-foreground">Replies</p>
                   </div>
                 </div>
-                <Badge variant="secondary" className="text-lg font-semibold">
-                  {activeCampaigns}
-                </Badge>
-              </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/20 border border-border mt-2">
-                <div className="flex items-center gap-3">
-                  <Mail className="h-5 w-5 text-blue-500" />
-                  <div>
-                    <p className="font-medium text-foreground">Total Emails</p>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/20 border border-border">
+                  <div className="flex items-center gap-3">
+                    <Megaphone className="h-5 w-5 text-warning" />
+                    <div>
+                      <p className="font-medium text-foreground">Active Campaigns</p>
+                    </div>
                   </div>
+                  <Badge variant="secondary" className="text-lg font-semibold">
+                    {activeCampaigns}
+                  </Badge>
                 </div>
-                <Badge variant="secondary" className="text-lg font-semibold">
-                  {emailStats?.totalMessages || 0}
-                </Badge>
               </div>
 
               {/* Only show "Manage All" if admin */}
@@ -290,19 +303,27 @@ export default function DashboardContent({
                   {recentActivity.map((activity: any) => (
                     <div
                       key={`${activity.type}-${activity.id}`}
-                      className="flex items-center justify-between p-3 rounded-lg border-2 border-border hover:bg-accent/20 hover:border-primary/30 transition-colors"
+                      onClick={() => {
+                        setSelectedActivity(activity);
+                        setIsDetailOpen(true);
+                      }}
+                      className="flex items-center justify-between p-3 rounded-lg border-2 border-border hover:bg-accent/20 hover:border-primary/30 transition-all duration-200 cursor-pointer group"
                     >
                       <div className="flex items-center gap-3 flex-1">
                         <div className={`p-2 rounded-full ${activity.type === 'call'
-                            ? (activity.call_outcome?.toLowerCase().includes('appointment') ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground')
-                            : activity.type === 'message'
-                              ? 'bg-purple-500/10 text-purple-500'
+                          ? (activity.call_outcome?.toLowerCase().includes('appointment') ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground')
+                          : activity.type === 'message'
+                            ? 'bg-purple-500/10 text-purple-500'
+                            : activity.type === 'form'
+                              ? 'bg-indigo-500/10 text-indigo-500' // Form style
                               : 'bg-blue-500/10 text-blue-500' // Email style
                           }`}>
                           {activity.type === 'call' ? (
                             activity.call_outcome?.toLowerCase().includes('appointment') ? <CheckCircle2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />
                           ) : activity.type === 'message' ? (
                             <MessageSquare className="h-4 w-4" />
+                          ) : activity.type === 'form' ? (
+                            <Database className="h-4 w-4" />
                           ) : (
                             <Mail className="h-4 w-4" />
                           )}
@@ -322,6 +343,11 @@ export default function DashboardContent({
                                 SMS
                               </Badge>
                             )}
+                            {activity.type === 'form' && (
+                              <Badge variant="outline" className="text-[10px] h-4 px-1 text-indigo-500 border-indigo-500/30">
+                                Form
+                              </Badge>
+                            )}
                           </div>
 
                           {activity.type === 'call' ? (
@@ -329,6 +355,12 @@ export default function DashboardContent({
                               {activity.date} • {activity.duration || formatDuration(activity.call_duration || 0)}
                             </p>
                           ) : activity.type === 'message' ? (
+                            <p className="text-sm text-muted-foreground truncate">
+                              {activity.snippet}
+                              <span className="opacity-50 mx-1">•</span>
+                              {activity.time}
+                            </p>
+                          ) : activity.type === 'form' ? (
                             <p className="text-sm text-muted-foreground truncate">
                               {activity.snippet}
                               <span className="opacity-50 mx-1">•</span>
@@ -366,6 +398,19 @@ export default function DashboardContent({
                       {activity.type === 'email' && (
                         <Badge variant="secondary" className="ml-2">
                           {activity.messageCount} msgs
+                        </Badge>
+                      )}
+
+                      {activity.type === 'form' && (
+                        <Badge
+                          variant="secondary"
+                          className={`ml-2 capitalize ${activity.category === 'large' ? 'bg-indigo-500 text-white' :
+                            activity.category === 'growing' ? 'bg-blue-500 text-white' :
+                              activity.category === 'medium' ? 'bg-cyan-500 text-white' :
+                                'bg-slate-500 text-white'
+                            }`}
+                        >
+                          {activity.category || 'Lead'}
                         </Badge>
                       )}
                     </div>
@@ -449,6 +494,11 @@ export default function DashboardContent({
           </Card>
         )}
 
+        <ActivityDetailDialog
+          activity={selectedActivity}
+          open={isDetailOpen}
+          onOpenChange={setIsDetailOpen}
+        />
       </div>
     </ThemeContainer>
   );

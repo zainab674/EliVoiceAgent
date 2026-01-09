@@ -109,6 +109,10 @@ campaignExecutionEngine.start();
 import { emailWorker } from './workers/email-worker.js';
 emailWorker.start();
 
+// Start MongoDB Sync Worker
+import mongoDBSyncWorker from './workers/mongodb-sync-worker.js';
+mongoDBSyncWorker.start();
+
 
 // Recording routes (matching voiceagents pattern exactly)
 

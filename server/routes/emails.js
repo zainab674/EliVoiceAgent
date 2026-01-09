@@ -29,19 +29,15 @@ router.get('/threads', requireAuth, async (req, res) => {
         }).select('_id');
         const assistantIds = assistants.map(a => a._id);
 
-        // Group by the "other person" in the conversation
-        // Include emails where user is the owner OR the assistant is assigned to the user
+        // Match only emails belonging to the current user
         let matchStage = {
-            $or: [
-                { userId: req.user._id },
-                { assistantId: { $in: assistantIds } }
-            ]
+            userId: new mongoose.Types.ObjectId(req.user._id)
         };
 
         if (normalizedAssistantId) {
-            matchStage = {
-                assistantId: new mongoose.Types.ObjectId(normalizedAssistantId)
-            };
+            // Add assistant filter to the existing matchStage
+            matchStage.assistantId = new mongoose.Types.ObjectId(normalizedAssistantId);
+
             // Optional security: ensure the assistantId belongs to the user
             if (!assistantIds.some(id => id.toString() === normalizedAssistantId) && req.user.role !== 'admin') {
                 return res.status(403).json({ success: false, message: 'Access denied to this assistant' });
@@ -58,6 +54,19 @@ router.get('/threads', requireAuth, async (req, res) => {
                             if: { $eq: ["$direction", "inbound"] },
                             then: "$from",
                             else: "$to"
+                        }
+                    },
+                    cleanOwnEmail: {
+                        $toLower: {
+                            $trim: {
+                                input: {
+                                    $cond: {
+                                        if: { $eq: ["$direction", "outbound"] },
+                                        then: "$from",
+                                        else: "$to"
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -95,7 +104,10 @@ router.get('/threads', requireAuth, async (req, res) => {
             },
             {
                 $group: {
-                    _id: "$cleanOtherParty", // Group by cleaned email address
+                    _id: {
+                        other: "$cleanOtherParty",
+                        own: "$cleanOwnEmail"
+                    },
                     lastMessage: { $first: "$$ROOT" },
                     messageCount: { $sum: 1 },
                     // Keep the most recent visual name
@@ -107,9 +119,10 @@ router.get('/threads', requireAuth, async (req, res) => {
 
         // Transform for frontend
         const formattedThreads = threads.map(t => ({
-            id: t._id, // This is now the clean email address
-            senderName: t.displayName || t._id, // Show the nice name if available
-            senderEmail: t._id,
+            id: `${t._id.other}|${t._id.own}`, // Use combined ID to separate by integration
+            senderName: t.displayName || t._id.other, // Show the nice name if available
+            senderEmail: t._id.other,
+            ownEmail: t._id.own,
             subject: t.lastMessage.subject,
             lastMessage: t.lastMessage.body ? t.lastMessage.body.substring(0, 100) : '',
             timestamp: t.lastMessage.createdAt,
@@ -153,7 +166,27 @@ router.get('/:id', requireAuth, async (req, res) => {
         }).select('_id');
         const assistantIds = assistants.map(a => a._id);
 
-        if (id.includes('@')) {
+        if (id.includes('|')) {
+            // New format: otherEmail|ownEmail
+            const [otherEmail, ownEmail] = id.split('|');
+            console.log(`[EmailAPI] Fetching conversation between [${ownEmail}] and [${otherEmail}]`);
+
+            const otherEmailRegex = new RegExp(otherEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            const ownEmailRegex = new RegExp(ownEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+            query = {
+                $and: [
+                    { userId: req.user._id },
+                    {
+                        $or: [
+                            { from: { $regex: otherEmailRegex }, to: { $regex: ownEmailRegex } },
+                            { to: { $regex: otherEmailRegex }, from: { $regex: ownEmailRegex } }
+                        ]
+                    }
+                ]
+            };
+        } else if (id.includes('@')) {
+            // Legacy/Fallback format
             // Extract email if format is "Name <email@domain.com>"
             const emailMatch = id.match(/<([^>]+)>/);
             const cleanEmail = emailMatch ? emailMatch[1] : id;
@@ -162,16 +195,11 @@ router.get('/:id', requireAuth, async (req, res) => {
             const escapedEmail = cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const emailRegex = new RegExp(escapedEmail, 'i');
 
-            console.log(`[EmailAPI] Searching for conversations with [${cleanEmail}]`);
+            console.log(`[EmailAPI] Searching for conversations with [${cleanEmail}] (Fallback)`);
 
             query = {
                 $and: [
-                    {
-                        $or: [
-                            { userId: req.user._id },
-                            { assistantId: { $in: assistantIds } }
-                        ]
-                    },
+                    { userId: req.user._id }, // Strict user check
                     {
                         $or: [
                             { from: { $regex: emailRegex } },
@@ -184,12 +212,7 @@ router.get('/:id', requireAuth, async (req, res) => {
             // It's a threadId
             query = {
                 $and: [
-                    {
-                        $or: [
-                            { userId: req.user._id },
-                            { assistantId: { $in: assistantIds } }
-                        ]
-                    },
+                    { userId: req.user._id }, // Strict user check
                     { threadId: id }
                 ]
             };
@@ -208,7 +231,9 @@ router.get('/:id', requireAuth, async (req, res) => {
             from: msg.direction === 'outbound' ? 'assistant' : 'user',
             content: msg.body,
             timestamp: msg.createdAt,
-            senderEmail: msg.from
+            senderEmail: msg.from,
+            status: msg.status,
+            error: msg.error
         }));
 
         res.json({ success: true, messages: formattedMessages });
@@ -336,7 +361,7 @@ router.post('/sync', requireAuth, async (req, res) => {
         const { emailWorker } = await import('../workers/email-worker.js');
 
         // Run in background but respond immediately
-        emailWorker.processEmails().then(() => {
+        emailWorker.processEmails(req.user._id, true).then(() => {
             console.log('[EmailAPI] Manual sync completed');
         }).catch(err => {
             console.error('[EmailAPI] Manual sync failed:', err);
@@ -346,6 +371,72 @@ router.post('/sync', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error triggering sync:', error);
         res.status(500).json({ success: false, message: 'Failed to start sync' });
+    }
+});
+
+// POST /api/v1/emails/:id/retry
+// Retry sending a failed email
+router.post('/:id/retry', requireAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const failedLog = await EmailLog.findOne({ _id: id, userId: req.user._id, status: 'failed' });
+
+        if (!failedLog) {
+            return res.status(404).json({ success: false, message: 'Failed email log not found' });
+        }
+
+        // Find the user to get integrations
+        const user = await User.findById(req.user._id);
+        if (!user || !user.email_integrations) {
+            return res.status(400).json({ success: false, message: 'User or email integrations not found' });
+        }
+
+        // Identify which integration to use based on the 'from' field in the log
+        const integration = user.email_integrations.find(i =>
+            i.email === failedLog.from || (i.config && i.config.email === failedLog.from)
+        ) || user.email_integrations[0]; // Fallback to first if not found
+
+        if (!integration || !integration.isActive) {
+            return res.status(400).json({ success: false, message: 'Matching active email integration not found' });
+        }
+
+        const smtpSettings = {
+            smtpHost: integration.smtpHost,
+            smtpPort: integration.smtpPort,
+            smtpUser: integration.smtpUser,
+            smtpPass: integration.smtpPass
+        };
+
+        const emailOptions = {
+            from: failedLog.from,
+            to: failedLog.to,
+            subject: failedLog.subject,
+            text: failedLog.body,
+            // If it was HTML, we might have lost the rich content if we only saved text, 
+            // but usually body stores what we sent.
+            html: failedLog.body.includes('<') ? failedLog.body : undefined
+        };
+
+        // Context for logging
+        const context = {
+            userId: user._id,
+            assistantId: failedLog.assistantId,
+            campaignId: failedLog.campaignId,
+            threadId: failedLog.threadId
+        };
+
+        console.log(`[EmailAPI] Retrying failed email ${id} for user ${user.email}`);
+
+        await emailService.sendEmail(smtpSettings, emailOptions, context);
+
+        // Delete the old failed log to keep the thread clean
+        await EmailLog.deleteOne({ _id: id });
+
+        res.json({ success: true, message: 'Email resent successfully' });
+
+    } catch (error) {
+        console.error('Error retrying email:', error);
+        res.status(500).json({ success: false, message: 'Failed to retry email: ' + error.message });
     }
 });
 

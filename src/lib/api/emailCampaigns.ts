@@ -67,3 +67,21 @@ export async function startEmailCampaign(campaignId: string) {
     }
     return data;
 }
+export async function pauseEmailCampaign(campaignId: string) {
+    const token = getAccessToken();
+    const headers: any = {
+        'Content-Type': 'application/json'
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_URL}/api/v1/email-campaigns/${campaignId}/pause`, {
+        method: 'POST',
+        headers: headers
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+        throw new Error(data.message || 'Failed to pause campaign');
+    }
+    return data;
+}

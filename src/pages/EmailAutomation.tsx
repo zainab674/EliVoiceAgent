@@ -4,10 +4,10 @@ import { ThemeContainer, ThemeCard } from "@/components/theme";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, BarChart3, Mail, RefreshCw, Play } from "lucide-react";
+import { Plus, BarChart3, Mail, RefreshCw, Play, Pause } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { EmailCampaignSettingsDialog } from "@/components/campaigns/EmailCampaignSettingsDialog";
-import { fetchEmailCampaigns, createEmailCampaign, startEmailCampaign, EmailCampaign } from "@/lib/api/emailCampaigns";
+import { fetchEmailCampaigns, createEmailCampaign, startEmailCampaign, pauseEmailCampaign, EmailCampaign } from "@/lib/api/emailCampaigns";
 
 export default function EmailAutomation() {
     const { toast } = useToast();
@@ -68,6 +68,23 @@ export default function EmailAutomation() {
             toast({
                 title: "Error",
                 description: "Failed to start campaign: " + error.message,
+                variant: "destructive"
+            });
+        }
+    };
+
+    const handlePause = async (campaignId: string) => {
+        try {
+            await pauseEmailCampaign(campaignId);
+            toast({
+                title: "Success",
+                description: "Campaign paused!",
+            });
+            loadCampaigns();
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: "Failed to pause campaign: " + error.message,
                 variant: "destructive"
             });
         }
@@ -166,6 +183,11 @@ export default function EmailAutomation() {
                                                 {(campaign.status === 'draft' || campaign.status === 'paused' || campaign.status === 'failed') && (
                                                     <Button variant="ghost" size="icon" onClick={() => handleStart(campaign._id)} title="Start Campaign">
                                                         <Play className="h-4 w-4 text-green-600" />
+                                                    </Button>
+                                                )}
+                                                {campaign.status === 'sending' && (
+                                                    <Button variant="ghost" size="icon" onClick={() => handlePause(campaign._id)} title="Pause Campaign">
+                                                        <Pause className="h-4 w-4 text-amber-600" />
                                                     </Button>
                                                 )}
                                             </TableCell>

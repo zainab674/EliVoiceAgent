@@ -41,6 +41,10 @@ const assistantSchema = new mongoose.Schema({
         type: String,
         default: 'You are a helpful legal assistant.'
     },
+    emailReplyPrompt: {
+        type: String,
+        default: ''
+    },
     firstMessage: { // Renamed from firstSms to be more generic if needed, or keeping aliases
         type: String,
         default: ''
@@ -91,7 +95,8 @@ const assistantSchema = new mongoose.Schema({
         post_call: {
             subject: { type: String, default: 'Information from our call' },
             body: { type: String, default: 'Hi, thanks for speaking with us. Here are the documents you requested.' },
-            sender: String
+            sender: String,
+            link: { type: String, default: '' }
         },
         follow_up: {
             subject: String,

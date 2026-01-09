@@ -35,6 +35,11 @@ const contactSchema = new mongoose.Schema({
     do_not_call: {
         type: Boolean,
         default: false
+    },
+    category: {
+        type: String,
+        enum: ['small', 'medium', 'growing', 'large', 'none'],
+        default: 'none'
     }
 }, {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }

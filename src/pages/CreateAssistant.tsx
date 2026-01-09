@@ -86,6 +86,7 @@ const CreateAssistant = () => {
       maxTokens: 250,
       firstMessage: "",
       systemPrompt: "",
+      emailReplyPrompt: "",
       language: "en",
       transcriber: {
         model: "nova-2",
@@ -180,7 +181,9 @@ const CreateAssistant = () => {
     emailTemplate: {
       subject: "",
       body: "",
-      fromEmail: ""
+      fromEmail: "",
+      emailReplyPrompt: "",
+      link: ""
     },
     nodes: [],
     edges: [],
@@ -262,6 +265,7 @@ const CreateAssistant = () => {
               language: data.modelSettings?.language || "en",
               firstMessage: data.firstMessage || data.modelSettings?.firstMessage || "",
               systemPrompt: data.systemPrompt || data.modelSettings?.systemPrompt || "",
+              emailReplyPrompt: data.emailReplyPrompt || data.modelSettings?.emailReplyPrompt || "",
               transcriber: {
                 model: data.modelSettings?.transcriber?.model || "nova-2",
                 language: data.modelSettings?.transcriber?.language || "en"
@@ -347,7 +351,9 @@ const CreateAssistant = () => {
             emailTemplate: {
               subject: data.email_templates?.post_call?.subject || "Information from our call",
               body: data.email_templates?.post_call?.body || "Hi, thanks for speaking with us. Here are the documents you requested.",
-              fromEmail: data.email_templates?.post_call?.sender || ""
+              fromEmail: data.email_templates?.post_call?.sender || "",
+              emailReplyPrompt: data.emailReplyPrompt || data.modelSettings?.emailReplyPrompt || "",
+              link: data.email_templates?.post_call?.link || ""
             },
             nodes: Array.isArray(data.nodes) ? data.nodes : [],
             edges: Array.isArray(data.edges) ? data.edges : [],
@@ -400,12 +406,14 @@ const CreateAssistant = () => {
       const payload = {
         name: formData.name,
         systemPrompt: formData.model.systemPrompt,
+        emailReplyPrompt: formData.emailTemplate.emailReplyPrompt,
         firstMessage: formData.model.firstMessage,
 
         modelSettings: {
           ...formData.model,
           // Explicitly ensuring these are saved if they are in the model tab
           systemPrompt: formData.model.systemPrompt,
+          emailReplyPrompt: formData.emailTemplate.emailReplyPrompt,
           firstMessage: formData.model.firstMessage,
         },
         voiceSettings: formData.voice,
@@ -418,7 +426,8 @@ const CreateAssistant = () => {
           post_call: {
             subject: formData.emailTemplate.subject,
             body: formData.emailTemplate.body,
-            sender: formData.emailTemplate.fromEmail
+            sender: formData.emailTemplate.fromEmail,
+            link: formData.emailTemplate.link
           }
         },
         nodes: formData.nodes,

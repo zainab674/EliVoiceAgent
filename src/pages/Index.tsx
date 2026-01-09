@@ -44,6 +44,10 @@ export default function Index() {
   const [selectedAssistantId, setSelectedAssistantId] = useState<string>('all');
   const [realCallHistory, setRealCallHistory] = useState<CallHistory[]>([]);
   const [isLoadingRealData, setIsLoadingRealData] = useState(true);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [campaignData, setCampaignData] = useState<any[]>([]);
+  const [emailThreads, setEmailThreads] = useState<any[]>([]);
+  const [smsMessages, setSmsMessages] = useState<any[]>([]);
 
   // Helper function to determine call outcome from transcription
   const getCallOutcome = (transcription: Array<{ role: string; content: any }>) => {
@@ -194,7 +198,8 @@ export default function Index() {
         avgDuration: 0,
         appointments: 0,
         bookingRate: 0,
-        successfulTransfers: 0
+        successfulTransfers: 0,
+        formSubmissions: 0
       };
     }
 
@@ -234,9 +239,10 @@ export default function Index() {
       avgDuration,
       appointments,
       bookingRate,
-      successfulTransfers
+      successfulTransfers,
+      formSubmissions: submissions.length
     };
-  }, [callLogs]);
+  }, [callLogs, submissions]);
 
   const handleRangeChange = (range) => {
     setDateRange(range);
@@ -256,7 +262,6 @@ export default function Index() {
   }, [callLogs]);
 
   // Fetch email history
-  const [emailThreads, setEmailThreads] = useState<any[]>([]);
   const fetchEmailHistory = async () => {
     if (isAuthLoading || !user?.id) return;
 
@@ -275,7 +280,6 @@ export default function Index() {
     }
   };
 
-  const [smsMessages, setSmsMessages] = useState<any[]>([]);
 
   const fetchSmsHistory = async () => {
     if (isAuthLoading || !user?.id) return;
@@ -295,9 +299,41 @@ export default function Index() {
     }
   };
 
+  const fetchSubmissions = async () => {
+    if (isAuthLoading || !user?.id) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/integrations/mongodb/submissions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setSubmissions(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('Error fetching submissions:', e);
+    }
+  };
+
+  const fetchCampaigns = async () => {
+    if (isAuthLoading || !user?.id) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/email-campaigns`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCampaignData(data.campaigns || []);
+      }
+    } catch (e) {
+      console.error('Error fetching campaigns:', e);
+    }
+  };
+
   useEffect(() => {
     fetchEmailHistory();
     fetchSmsHistory();
+    fetchSubmissions();
+    fetchCampaigns();
   }, [isAuthLoading, user?.id, selectedAssistantId]);
 
   // Combine calls and emails for unified activity
@@ -317,6 +353,10 @@ export default function Index() {
         time: new Date(email.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         type: 'email',
         messageCount: email.messageCount,
+        recipientName: email.recipientName,
+        recipientEmail: email.recipientEmail,
+        campaignName: email.campaignName,
+        campaignSubject: email.campaignSubject,
         timestamp: new Date(email.timestamp).getTime(),
         status: 'completed'
       })),
@@ -331,6 +371,18 @@ export default function Index() {
         direction: sms.direction,
         timestamp: new Date(sms.createdAt).getTime(),
         status: sms.status
+      })),
+      ...submissions.map(sub => ({
+        id: sub._id,
+        name: sub.data?.firstName || sub.data?.Name || sub.data?.email || 'New Lead',
+        snippet: `Form submitted via ${sub.source || 'MongoDB'} integration`,
+        date: new Date(sub.syncedAt || sub.createdAt).toLocaleDateString('en-US'),
+        time: new Date(sub.syncedAt || sub.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        type: 'form',
+        category: sub.category,
+        data: sub.data,
+        timestamp: new Date(sub.syncedAt || sub.createdAt).getTime(),
+        status: sub.status || 'synced'
       }))
     ];
 
@@ -339,11 +391,18 @@ export default function Index() {
 
   // Calculate email stats
   const emailStats = useMemo(() => {
+    const totalSent = campaignData.reduce((sum, c) => sum + (c.stats?.sent || 0), 0);
+    const totalReplies = campaignData.reduce((sum, c) => sum + (c.stats?.replies || 0), 0);
+    const replyRate = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0;
+
     return {
       totalThreads: emailThreads.length,
-      totalMessages: emailThreads.reduce((sum, t) => sum + (t.messageCount || 1), 0)
+      totalMessages: emailThreads.reduce((sum, t) => sum + (t.messageCount || 1), 0),
+      totalSent,
+      totalReplies,
+      replyRate
     };
-  }, [emailThreads]);
+  }, [emailThreads, campaignData]);
 
 
   // Show loading state if auth is still loading

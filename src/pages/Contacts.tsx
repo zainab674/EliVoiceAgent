@@ -72,33 +72,57 @@ const parseCSV = (csvText: string): CSVContact[] => {
   if (lines.length < 2) return [];
 
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+  console.log('CSV Headers found:', headers);
   const data: CSVContact[] = [];
 
   for (let i = 1; i < lines.length; i++) {
     const values = lines[i].split(',').map(v => v.trim().replace(/['"]/g, ''));
-    if (values.length !== headers.length) continue;
+    if (values.length !== headers.length) {
+      console.warn(`Row ${i + 1} has column mismatch. Expected ${headers.length}, got ${values.length}. Proceeding anyway.`);
+      // If we have more values than headers, they will just be ignored.
+      // If we have fewer, they will be undefined and default to '' below.
+    }
 
     const row: any = {};
     headers.forEach((header, index) => {
       row[header] = values[index] || '';
     });
 
+    // Handle generic "Name" or "Full Name" column
+    const fullName = row.name || row.full_name || row.fullname || row['full name'] || '';
+    let firstName = row.first_name || row.firstname || row.first || row.fname || '';
+    let lastName = row.last_name || row.lastname || row.last || row.lname || '';
+
+    // If first name is missing but we have a full name, try to parse it
+    if (!firstName && fullName) {
+      const nameParts = fullName.split(' ');
+      if (nameParts.length > 0) {
+        firstName = nameParts[0];
+        if (nameParts.length > 1) {
+          lastName = nameParts.slice(1).join(' ');
+        }
+      }
+    }
+
     // Map common column names to our interface
     const contact: CSVContact = {
-      first_name: row.first_name || row.firstname || row.first || row.fname || '',
-      last_name: row.last_name || row.lastname || row.last || row.lname || '',
+      first_name: firstName,
+      last_name: lastName,
       phone: row.phone || row.phone_number || row.telephone || row.mobile || '',
       email: row.email || row.email_address || row.e_mail || '',
       status: (row.status || 'active') as 'active' | 'inactive' | 'do-not-call',
       do_not_call: row.do_not_call === 'true' || row.dnd === 'true' || row.do_not_call === '1' || row.dnd === '1' || false
     };
 
-    // Only add if we have at least first name and either phone or email
-    if (contact.first_name && (contact.phone || contact.email)) {
+    // Only add if we have either phone or email
+    if (contact.phone || contact.email) {
       data.push(contact);
+    } else {
+      console.log('Skipping row due to missing phone/email:', row);
     }
   }
 
+  console.log('Parsed CSV Data:', data);
   return data;
 };
 
@@ -488,8 +512,8 @@ export default function Contacts() {
               <div className="space-y-2">
                 <div
                   className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${selectedList === "all" && !showCsvPreview
-                      ? "bg-primary/20 border border-primary/50"
-                      : "bg-card border border-border hover:bg-accent/50 hover:border-primary/50"
+                    ? "bg-primary/20 border border-primary/50"
+                    : "bg-card border border-border hover:bg-accent/50 hover:border-primary/50"
                     }`}
                   onClick={() => {
                     setSelectedList("all");
@@ -509,8 +533,8 @@ export default function Contacts() {
                   <div
                     key={list.id}
                     className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${selectedList === list.id && !showCsvPreview
-                        ? "bg-primary/20 border border-primary/50"
-                        : "bg-card border border-border hover:bg-accent/50 hover:border-primary/50"
+                      ? "bg-primary/20 border border-primary/50"
+                      : "bg-card border border-border hover:bg-accent/50 hover:border-primary/50"
                       }`}
                     onClick={() => {
                       setSelectedList(list.id);
@@ -552,8 +576,8 @@ export default function Contacts() {
                     <div
                       key={file.id}
                       className={`flex items-center justify-between p-3 rounded-lg transition-all group cursor-pointer ${selectedCsvFile === file.id && showCsvPreview
-                          ? "bg-primary/20 border border-primary/50"
-                          : "bg-card border border-border hover:bg-accent/50 hover:border-primary/50"
+                        ? "bg-primary/20 border border-primary/50"
+                        : "bg-card border border-border hover:bg-accent/50 hover:border-primary/50"
                         }`}
                       onClick={(e) => {
                         e.preventDefault();
@@ -703,10 +727,10 @@ export default function Contacts() {
                                 <Badge
                                   variant={contact.status === 'active' ? 'default' : contact.status === 'inactive' ? 'secondary' : 'destructive'}
                                   className={`text-xs ${contact.status === 'active'
-                                      ? 'bg-success/20 text-success border-success/30'
-                                      : contact.status === 'inactive'
-                                        ? 'bg-secondary text-secondary-foreground border-border'
-                                        : 'bg-destructive/20 text-destructive border-destructive/30'
+                                    ? 'bg-success/20 text-success border-success/30'
+                                    : contact.status === 'inactive'
+                                      ? 'bg-secondary text-secondary-foreground border-border'
+                                      : 'bg-destructive/20 text-destructive border-destructive/30'
                                     }`}
                                 >
                                   {contact.status}

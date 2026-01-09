@@ -35,6 +35,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RefundPolicy from "./pages/RefundPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import Pricing from "./pages/Pricing";
+import Submissions from "./pages/Submissions";
 import ScrollToTop from "./components/ScrollToTop";
 import { getAccessToken } from "@/lib/auth";
 
@@ -148,6 +149,7 @@ function AnimatedRoutes() {
         <Route path="/emails" element={<Emails />} />
         <Route path="/email-automation" element={<EmailAutomation />} />
         <Route path="/sms-campaign" element={<SmsCampaignPage />} />
+        <Route path="/submissions" element={<Submissions />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/integrations" element={<Integrations />} />

@@ -154,13 +154,16 @@ router.post('/:callId/send-email', async (req, res) => {
         const clientName = call.structured_data?.name || call.structured_data?.Name || call.first_name || 'there';
         const assistantName = assistant.name || 'Your Assistant';
 
-        let subject = emailTemplate.subject
-            .replace(/\{clientName\}/g, clientName)
-            .replace(/\{assistantName\}/g, assistantName);
+        const trackingLink = emailTemplate.link || '';
 
-        let body = emailTemplate.body
-            .replace(/\{clientName\}/g, clientName)
-            .replace(/\{assistantName\}/g, assistantName);
+        const replaceVars = (text) => {
+            return text
+                .replace(/\{clientName\}/g, clientName)
+                .replace(/\{assistantName\}/g, assistantName);
+        };
+
+        let subject = replaceVars(emailTemplate.subject);
+        let body = replaceVars(emailTemplate.body).replace(/\{\{link\}\}/g, trackingLink);
 
         // Prepare attachments from assigned documents
         const attachments = [];
@@ -191,13 +194,33 @@ router.post('/:callId/send-email', async (req, res) => {
             }
         }
 
+        // Prepare content with link replacement or appendix
+        let rawBody = replaceVars(emailTemplate.body);
+        let textBody = rawBody;
+        let htmlBody = rawBody.replace(/\n/g, '<br>');
+
+        if (trackingLink) {
+            const linkHtml = `<a href="${trackingLink}" style="color: #4f46e5; text-decoration: underline;">${trackingLink}</a>`;
+            if (rawBody.includes('{{link}}')) {
+                textBody = textBody.replace(/\{\{link\}\}/g, trackingLink);
+                htmlBody = htmlBody.replace(/\{\{link\}\}/g, linkHtml);
+            } else {
+                // Appendix if no placeholder
+                textBody += `\n\n${trackingLink}`;
+                htmlBody += `<br><br>${linkHtml}`;
+            }
+        } else {
+            textBody = textBody.replace(/\{\{link\}\}/g, '');
+            htmlBody = htmlBody.replace(/\{\{link\}\}/g, '');
+        }
+
         // Prepare email options
         const emailOptions = {
             from: emailTemplate.sender || emailIntegration.email,
             to: clientEmail,
             subject: subject,
-            text: body,
-            html: `<div style="font-family: Arial, sans-serif; line-height: 1.6;">${body.replace(/\n/g, '<br>')}</div>`,
+            text: textBody,
+            html: `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #374151;">${htmlBody}</div>`,
             attachments: attachments
         };
 

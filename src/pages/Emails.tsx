@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/layout/DashboardLayout";
 import { Card } from "@/components/ui/card";
-import { Search, Mail, ArrowRight, Loader2, RefreshCcw } from "lucide-react";
+import { Search, Mail, ArrowRight, Loader2, RefreshCcw, RefreshCw } from "lucide-react";
 import { getAccessToken } from "@/lib/auth"; // Corrected path
 import { useAuth } from "@/contexts/SupportAccessAuthContext";
 import { formatDistanceToNow } from "date-fns";
@@ -24,6 +24,8 @@ type EmailMessage = {
     content: string;
     timestamp: string;
     senderEmail: string;
+    status: "sent" | "failed" | "received" | "pending";
+    error?: string;
 };
 
 export default function Emails() {
@@ -34,28 +36,31 @@ export default function Emails() {
     const [searchQuery, setSearchQuery] = useState("");
     const [loadingThreads, setLoadingThreads] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
+    const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
+    const [isAutoSyncing, setIsAutoSyncing] = useState(false);
 
-    // Fetch Threads
-    useEffect(() => {
-        const fetchThreads = async () => {
-            setLoadingThreads(true);
-            try {
-                const token = getAccessToken();
-                const headers = token ? { Authorization: `Bearer ${token}` } : {};
-                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/emails/threads?search=${searchQuery}`, {
-                    headers
-                });
-                const data = await res.json();
-                if (data.success) {
-                    setThreads(data.threads);
-                }
-            } catch (error) {
-                console.error("Failed to fetch threads", error);
-            } finally {
-                setLoadingThreads(false);
+    // Move fetchThreads out of useEffect to be reusable
+    const fetchThreads = async (showLoading = true) => {
+        if (showLoading) setLoadingThreads(true);
+        try {
+            const token = getAccessToken();
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/emails/threads?search=${searchQuery}`, {
+                headers
+            });
+            const data = await res.json();
+            if (data.success) {
+                setThreads(data.threads);
             }
-        };
+        } catch (error) {
+            console.error("Failed to fetch threads", error);
+        } finally {
+            if (showLoading) setLoadingThreads(false);
+        }
+    };
 
+    // Fetch Threads on mount and search change
+    useEffect(() => {
         // Debounce search
         const timer = setTimeout(() => {
             if (user) fetchThreads();
@@ -64,28 +69,79 @@ export default function Emails() {
         return () => clearTimeout(timer);
     }, [searchQuery, user]);
 
-    // Fetch Messages when thread selected
+    // Auto-sync every 20 seconds
     useEffect(() => {
-        if (!selectedThread) return;
+        if (!user) return;
 
-        const fetchMessages = async () => {
-            setLoadingMessages(true);
+        const intervalId = setInterval(async () => {
+            console.log("Auto-syncing emails... (every 20s)");
+            setIsAutoSyncing(true);
             try {
                 const token = getAccessToken();
-                const headers = token ? { Authorization: `Bearer ${token}` } : {};
-                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/emails/${selectedThread.id}`, { headers });
-                const data = await res.json();
-                if (data.success) {
-                    setMessages(data.messages);
-                }
-            } catch (error) {
-                console.error("Failed to fetch messages", error);
-            } finally {
-                setLoadingMessages(false);
-            }
-        };
+                // Trigger background sync on server
+                await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/emails/sync`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
 
-        fetchMessages();
+                // Refetch threads (without resetting loading state to avoid flickering)
+                await fetchThreads(false);
+                // Also refetch messages if a thread is selected
+                if (selectedThread) await fetchMessages(false);
+
+                setLastSyncTime(new Date());
+            } catch (error) {
+                console.error("Auto-sync failed", error);
+            } finally {
+                setIsAutoSyncing(false);
+            }
+        }, 20000);
+
+        return () => clearInterval(intervalId);
+    }, [user, searchQuery, selectedThread]);
+
+    // Move fetchMessages out of useEffect to be reusable
+    const fetchMessages = async (showLoading = true) => {
+        if (!selectedThread) return;
+        if (showLoading) setLoadingMessages(true);
+        try {
+            const token = getAccessToken();
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/emails/${selectedThread.id}`, { headers });
+            const data = await res.json();
+            if (data.success) {
+                setMessages(data.messages);
+            }
+        } catch (error) {
+            console.error("Failed to fetch messages", error);
+        } finally {
+            if (showLoading) setLoadingMessages(false);
+        }
+    };
+
+    const handleRetry = async (messageId: string) => {
+        try {
+            const token = getAccessToken();
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/v1/emails/${messageId}/retry`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                // Refresh messages to see the new sent log
+                await fetchMessages(false);
+            } else {
+                alert("Retry failed: " + data.message);
+            }
+        } catch (error) {
+            console.error("Retry error:", error);
+            alert("An error occurred while retrying.");
+        }
+    };
+
+    // Fetch Messages when thread selected
+    useEffect(() => {
+        if (selectedThread) fetchMessages();
     }, [selectedThread]);
 
     // Helper to clean email body
@@ -115,6 +171,18 @@ export default function Emails() {
                 {/* Left Column: Email List */}
                 <div className="w-1/3 flex flex-col gap-4 overflow-hidden h-full">
                     <Card className="h-full flex flex-col border-border/40 shadow-sm bg-card/50 backdrop-blur-sm overflow-hidden">
+                        <div className="px-4 py-2 border-b border-border/40 bg-secondary/20 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <span className={`h-2 w-2 rounded-full ${isAutoSyncing ? 'bg-primary animate-pulse' : 'bg-success'}`} />
+                                <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+                                    {isAutoSyncing ? 'Syncing...' : 'Live Sync ON'}
+                                </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-medium">
+                                Last updated: {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
+                        </div>
+
                         {/* Search Bar */}
                         <div className="p-4 border-b border-border/40 flex gap-2">
                             <div className="relative flex-1">
@@ -137,14 +205,14 @@ export default function Emails() {
                                             headers: { Authorization: `Bearer ${token}` }
                                         });
                                         // Wait a bit then refresh
-                                        setTimeout(() => {
-                                            setSearchQuery(prev => prev + " ");
-                                            setTimeout(() => setSearchQuery(prev => prev.trim()), 100);
+                                        setTimeout(async () => {
+                                            await fetchThreads(false);
+                                            setLastSyncTime(new Date());
                                         }, 2000);
                                     } catch (e) { console.error(e); setLoadingThreads(false); }
                                 }}
                                 className="p-2 bg-secondary/50 rounded-lg hover:bg-secondary/80 transition-colors"
-                                title="Sync Emails"
+                                title="Force Sync Now"
                             >
                                 <RefreshCcw className={`h-4 w-4 ${loadingThreads ? 'animate-spin' : ''}`} />
                             </button>
@@ -228,11 +296,28 @@ export default function Emails() {
                                                     <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider opacity-70">
                                                         {message.from === 'assistant' ? 'AI Assistant' : message.senderEmail}
                                                     </span>
+                                                    {message.status === 'failed' && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 flex items-center gap-1">
+                                                                Failed to send
+                                                            </span>
+                                                            <button
+                                                                onClick={() => handleRetry(message.id)}
+                                                                className="p-1 hover:bg-red-100 rounded-full text-red-600 transition-colors shadow-sm bg-white"
+                                                                title="Retry Send"
+                                                            >
+                                                                <RefreshCw className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                     <span className="text-[10px] text-muted-foreground opacity-50">•</span>
                                                     <span className="text-[10px] text-muted-foreground opacity-50">
                                                         {message.timestamp ? new Date(message.timestamp).toLocaleString() : ''}
                                                     </span>
                                                 </div>
+                                                {message.status === 'failed' && message.error && (
+                                                    <p className="text-[10px] text-red-400 mt-1 italic max-w-xs">{message.error}</p>
+                                                )}
                                             </div>
                                         ))
                                     )}

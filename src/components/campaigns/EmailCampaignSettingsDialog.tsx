@@ -33,7 +33,9 @@ export function EmailCampaignSettingsDialog({ open, onOpenChange, onSave }: Emai
     const [sourceId, setSourceId] = useState(''); // Stores either listId or csvFileId
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
+    const [link, setLink] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
+    const [image, setImage] = useState<File | null>(null);
 
     // Data State
     const [assistants, setAssistants] = useState<any[]>([]);
@@ -113,8 +115,12 @@ export function EmailCampaignSettingsDialog({ open, onOpenChange, onSave }: Emai
             }
             formData.append('subject', subject);
             formData.append('body', body);
+            formData.append('link', link);
             if (attachment) {
                 formData.append('attachment', attachment);
+            }
+            if (image) {
+                formData.append('image', image);
             }
 
             await onSave(formData);
@@ -124,7 +130,9 @@ export function EmailCampaignSettingsDialog({ open, onOpenChange, onSave }: Emai
             setName('');
             setSubject('');
             setBody('');
+            setLink('');
             setAttachment(null);
+            setImage(null);
 
         } catch (error) {
             console.error(error);
@@ -268,12 +276,19 @@ export function EmailCampaignSettingsDialog({ open, onOpenChange, onSave }: Emai
                                 value={body}
                                 onChange={e => setBody(e.target.value)}
                                 placeholder="Email content..."
-                                className="min-h-[150px]"
                             />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Call to Action / Tracking Link (Optional)</Label>
+                            <Input value={link} onChange={e => setLink(e.target.value)} placeholder="https://example.com/booking" />
                         </div>
                         <div className="grid gap-2">
                             <Label>Attachment (Optional)</Label>
                             <Input type="file" onChange={e => setAttachment(e.target.files?.[0] || null)} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Body Image (Optional - Embedded in email body)</Label>
+                            <Input type="file" accept="image/*" onChange={e => setImage(e.target.files?.[0] || null)} />
                         </div>
 
                     </div>

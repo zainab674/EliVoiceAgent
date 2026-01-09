@@ -80,6 +80,13 @@ const userSchema = new mongoose.Schema({
         email: String,
         isActive: { type: Boolean, default: true }
     }],
+    mongodb_configurations: [{
+        connectionString: String,
+        collectionName: String,
+        assistantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assistant' },
+        isActive: { type: Boolean, default: true },
+        lastSync: Date
+    }],
     createdAt: {
         type: Date,
         default: Date.now
